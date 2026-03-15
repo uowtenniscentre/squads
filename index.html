@@ -249,9 +249,24 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 .pw-btns{display:flex;gap:8px}
 
 @media(min-width:560px){.frow{flex-direction:row}}
+
+/* ── PORTRAIT LOCK — prompt to rotate if in portrait ── */
+#rotatePrompt{display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+@media(orientation:portrait){
+  #rotatePrompt{display:flex}
+}
+.rotate-icon{font-size:5rem;animation:spin90 1.5s ease-in-out infinite alternate}
+@keyframes spin90{from{transform:rotate(0deg)}to{transform:rotate(90deg)}}
+.rotate-msg{color:#fff;font-family:'Outfit',sans-serif;font-size:1.3rem;font-weight:600;letter-spacing:.05em;text-align:center;line-height:1.5}
 </style>
 </head>
 <body>
+
+<!-- PORTRAIT LOCK -->
+<div id="rotatePrompt">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-msg">Please rotate your tablet<br>to landscape mode</div>
+</div>
 
 <!-- SIDE NAV -->
 <nav class="side-nav">
@@ -1652,6 +1667,10 @@ document.head.appendChild(_x);
 renderToday();
 // Check if weekly auto-backup should run today
 checkAutoBackup();
+// Attempt to lock orientation to landscape (works when installed as PWA)
+if(screen.orientation&&screen.orientation.lock){
+  screen.orientation.lock('landscape').catch(()=>{});
+}
 
 </script>
 </body>
