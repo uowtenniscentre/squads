@@ -165,8 +165,8 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 .s-gender{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem}
 .s-name{font-size:1.375rem;font-weight:600;color:var(--text);letter-spacing:.054em}
 .s-yr-inline{font-size:.72rem;color:var(--muted);font-family:var(--mono);margin-left:4px;font-weight:500}
-.att-btns{display:flex;gap:6px}
-.att-b{width:52px;height:36px;border-radius:4px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .1s;padding:0}
+.att-btns{display:flex;gap:8px}
+.att-b{width:36px;height:36px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .1s}
 .att-b:active{transform:scale(.88)}
 
 /* HOL BANNER */
@@ -1022,21 +1022,60 @@ function renderAttBody(){
   const nU=kids.length-nP-nA;
   const pct=(nP+nA)>0?Math.round(nP/(nP+nA)*100):null;
   // Progress bar: coloured fill on subtle track, label outside bar, count inside
+  // PRESENT bar: straight left edge (outer), double-chevron >> on right side pointing toward SQUAD REGISTER
+  // ABSENT bar:  double-chevron << on left side pointing toward SQUAD REGISTER, straight right edge (outer)
   const pBar=(val,max,color,label,align)=>{
     const w=max>0?Math.max(Math.round((val/max)*100),0):0;
     const countTxt=`${val} / ${max}`;
-    // Present bar: label on left, fills left→right. Absent bar: label on right, fills right→left.
-    if(align==='left') return`<div style="flex:1;display:flex;align-items:center;gap:6px">
-      <span style="font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:${color};flex-shrink:0">${label}</span>
-      <div style="flex:1;height:18px;border-radius:9px;background:rgba(0,0,0,.07);position:relative;overflow:hidden">
-        <div style="position:absolute;left:0;top:0;bottom:0;width:${w}%;background:${color};border-radius:9px;transition:width .3s"></div>
-        <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.65rem;font-weight:900;color:${w>25?'#fff':color};font-family:var(--mono);white-space:nowrap;z-index:1">${countTxt}</span>
-      </div>
-    </div>`;
-    return`<div style="flex:1;display:flex;align-items:center;gap:6px">
-      <div style="flex:1;height:18px;border-radius:9px;background:rgba(0,0,0,.07);position:relative;overflow:hidden">
-        <div style="position:absolute;right:0;top:0;bottom:0;width:${w}%;background:${color};border-radius:9px;transition:width .3s"></div>
-        <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.65rem;font-weight:900;color:${w>25?'#fff':color};font-family:var(--mono);white-space:nowrap;z-index:1">${countTxt}</span>
+    const H=28; // bar height px
+    const chevW=14; // chevron notch width
+    // Clip path: present bar clips right side to chevron >>; absent bar clips left side to chevron <<
+    const uid=`pb_${Math.random().toString(36).slice(2,7)}`;
+    if(align==='left'){
+      // Label | [====>>] — straight left, chevron right
+      return`<div style="flex:1;display:flex;align-items:center;gap:7px">
+        <span style="font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:${color};flex-shrink:0">${label}</span>
+        <div style="flex:1;position:relative;height:${H}px">
+          <svg width="100%" height="${H}" viewBox="0 0 200 ${H}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+            <defs>
+              <clipPath id="${uid}">
+                <polygon points="0,0 186,0 200,${H/2} 186,${H} 0,${H}"/>
+              </clipPath>
+            </defs>
+            <!-- track -->
+            <polygon points="0,0 186,0 200,${H/2} 186,${H} 0,${H}" fill="rgba(0,0,0,.25)"/>
+            <!-- fill scaled to percentage — use nested svg to scale width -->
+            <svg width="${w}%" height="${H}" clip-path="url(#${uid})">
+              <polygon points="0,0 186,0 200,${H/2} 186,${H} 0,${H}" fill="${color}" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <!-- second chevron stripe for depth -->
+            <polyline points="174,2 188,${H/2} 174,${H-2}" fill="none" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+            <polyline points="164,2 178,${H/2} 164,${H-2}" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="2"/>
+          </svg>
+          <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.65rem;font-weight:900;color:${w>30?'#fff':color};font-family:var(--mono);white-space:nowrap;z-index:1;pointer-events:none">${countTxt}</span>
+        </div>
+      </div>`;
+    }
+    // [<<====] | Label — chevron left, straight right
+    return`<div style="flex:1;display:flex;align-items:center;gap:7px">
+      <div style="flex:1;position:relative;height:${H}px">
+        <svg width="100%" height="${H}" viewBox="0 0 200 ${H}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+          <defs>
+            <clipPath id="${uid}b">
+              <polygon points="14,0 200,0 200,${H} 14,${H} 0,${H/2}"/>
+            </clipPath>
+          </defs>
+          <!-- track -->
+          <polygon points="14,0 200,0 200,${H} 14,${H} 0,${H/2}" fill="rgba(0,0,0,.25)"/>
+          <!-- fill: right-aligned, scaled width -->
+          <svg x="${200-w*2}" width="${w*2}%" height="${H}" clip-path="url(#${uid}b)" style="overflow:visible">
+            <polygon points="${-200+w*2},0 200,0 200,${H} ${-200+w*2},${H} ${-214+w*2},${H/2}" fill="${color}" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <!-- chevron stripes for depth -->
+          <polyline points="26,2 12,${H/2} 26,${H-2}" fill="none" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+          <polyline points="36,2 22,${H/2} 36,${H-2}" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="2"/>
+        </svg>
+        <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.65rem;font-weight:900;color:${w>30?'#fff':color};font-family:var(--mono);white-space:nowrap;z-index:1;pointer-events:none">${countTxt}</span>
       </div>
       <span style="font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:${color};flex-shrink:0">${label}</span>
     </div>`;
@@ -1060,19 +1099,9 @@ function renderAttBody(){
   const list=document.getElementById('sList');
   // Set notes textarea value safely via JS (handles quotes, HTML chars etc.)
   document.getElementById('noteTa').value=att.notes||'';
-  // Present button: left edge straight (flush with label), right side double-chevron >> pointing right toward register
-  const svgPresent=(on)=>`<svg width="52" height="36" viewBox="0 0 52 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M0 4 L0 32 L36 32 L52 18 L36 4 Z" fill="${on?'#22c55e':'#252630'}"/>
-    <path d="M30 32 L46 18 L30 4" fill="${on?'#1aad5a':'#1e1f26'}" opacity="${on?'1':'0.5'}"/>
-    <path d="M11 19l4 4 8-9" stroke="${on?'#000':'#4a5568'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  // Absent button: left side double-chevron << pointing left toward register, right edge straight
-  const svgAbsent=(on)=>`<svg width="52" height="36" viewBox="0 0 52 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M52 4 L52 32 L16 32 L0 18 L16 4 Z" fill="${on?'#f87171':'#252630'}"/>
-    <path d="M22 32 L6 18 L22 4" fill="${on?'#e05555':'#1e1f26'}" opacity="${on?'1':'0.5'}"/>
-    <path d="M30 13l-5 5 5 5" stroke="${on?'#000':'#4a5568'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M36 13l-5 5 5 5" stroke="${on?'#000':'#4a5568'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
+  // Child row buttons — original circle tick/cross
+  const svgPresent=(on)=>`<svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="18" fill="${on?'#22c55e':'#252630'}"/><path d="M11 18.5l4.5 4.5 9.5-10" stroke="${on?'#000':'#4a5568'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgAbsent=(on)=>`<svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="18" fill="${on?'#f87171':'#252630'}"/><path d="M12 12l12 12M24 12l-12 12" stroke="${on?'#000':'#4a5568'}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
   // Gender icons — using exact paths provided by user
   const svgMale=`<svg width="26" height="26" viewBox="0 0 660 656" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
     <g transform="matrix(1,0,0,1,-1887.36,-1522.83)"><g transform="matrix(1,0,0,1,12.2427,784.785)">
