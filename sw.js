@@ -1,9 +1,8 @@
 // Junior Squads Attendance — Service Worker
 // Caches all app files so it works completely offline after first visit
 
-const CACHE = 'squads-v2';
+const CACHE = 'squads-v3';
 const FILES = [
-  '/squads/',
   '/squads/index.html',
   '/squads/manifest.json',
   '/squads/icon-192.svg',
