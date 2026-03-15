@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Squads · Attendance Statistics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0d10;
+  --surface:#13141a;
+  --card:#1a1b22;
+  --card2:#1f2029;
+  --border:#25262f;
+  --border2:#2e3040;
+  --text:#e8eaf0;
+  --muted:#5a5f72;
+  --muted2:#8890a8;
+  --accent:#3b82f6;
+  --present:#22c55e;
+  --absent:#f87171;
+  --holiday:#fbbf24;
+  --cdev:#fb923c;
+  --cprepf:#c084fc;
+  --cu11:#4ade80;
+  --co11:#facc15;
+  --mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Outfit',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── TOPBAR ── */
+.topbar{
+  background:#000;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  padding:0 28px;
+  height:68px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:100;
+}
+.topbar-title{
+  font-size:1.1rem;
+  font-weight:700;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:#fff;
+}
+.topbar-title span{color:var(--accent)}
+.topbar-meta{font-family:var(--mono);font-size:.7rem;color:var(--muted);text-align:right;line-height:1.6}
+.topbar-load{
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:8px 18px;
+  font-family:'Outfit',sans-serif;
+  font-size:.82rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:opacity .15s;
+}
+.topbar-load:hover{opacity:.85}
+
+/* ── DROP ZONE ── */
+#dropZone{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:calc(100vh - 68px);
+  padding:40px 20px;
+  text-align:center;
+  gap:24px;
+  transition:background .2s;
+}
+#dropZone.drag-over{background:rgba(59,130,246,.06)}
+.drop-icon{
+  width:88px;height:88px;
+  border-radius:50%;
+  background:rgba(59,130,246,.1);
+  border:2px solid rgba(59,130,246,.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:2.4rem;
+}
+.drop-title{font-size:2rem;font-weight:800;color:#fff;letter-spacing:-.01em}
+.drop-sub{font-size:1rem;color:var(--muted2);max-width:400px;line-height:1.6}
+.drop-btn{
+  background:var(--accent);color:#fff;
+  border:none;border-radius:10px;
+  padding:13px 32px;
+  font-family:'Outfit',sans-serif;
+  font-size:.95rem;font-weight:700;
+  cursor:pointer;transition:opacity .15s;
+}
+.drop-btn:hover{opacity:.85}
+.drop-hint{font-size:.78rem;color:var(--muted);font-family:var(--mono)}
+
+/* ── DASHBOARD ── */
+#dashboard{display:none;padding:24px 28px 60px;max-width:1200px;margin:0 auto}
+
+/* season selector bar */
+.season-bar{
+  display:flex;align-items:center;gap:16px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 18px;
+  margin-bottom:24px;
+  flex-wrap:wrap;
+}
+.season-bar-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.season-info{font-size:.9rem;font-weight:700;color:var(--text)}
+.season-weeks{font-family:var(--mono);font-size:.75rem;color:var(--accent)}
+.season-bar-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pill-btn{
+  padding:6px 14px;border-radius:20px;border:1.5px solid var(--border2);
+  background:transparent;color:var(--muted2);
+  font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:700;
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.pill-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.pill-btn:hover:not(.on){border-color:var(--accent);color:var(--accent)}
+
+/* section titles */
+.sec-title{
+  font-size:.65rem;font-weight:800;
+  text-transform:uppercase;letter-spacing:1.4px;
+  color:var(--muted);
+  margin-bottom:14px;margin-top:32px;
+  display:flex;align-items:center;gap:8px;
+}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* STAT PILLS row */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:8px}
+.kpi{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:14px 16px;
+}
+.kpi-n{font-size:2rem;font-weight:900;font-family:var(--mono);line-height:1;color:#fff}
+.kpi-l{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:5px}
+.kpi-sub{font-size:.72rem;color:var(--muted2);margin-top:3px;font-family:var(--mono)}
+
+/* GROUP CARDS row */
+.grp-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:8px}
+.grp-card{
+  border-radius:14px;padding:16px 18px;
+  border:1.5px solid;
+}
+.grp-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.grp-card-name{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+.grp-card-pct{font-size:2rem;font-weight:900;font-family:var(--mono);line-height:1;color:#fff}
+.grp-card-meta{font-size:.72rem;color:rgba(255,255,255,.5);margin-top:4px}
+.grp-bar-track{height:5px;border-radius:3px;background:rgba(0,0,0,.3);margin-top:10px;overflow:hidden}
+.grp-bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* TREND CHART */
+.chart-card{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:14px;padding:20px;margin-bottom:8px;
+  overflow:hidden;
+}
+.chart-title{font-size:.82rem;font-weight:700;margin-bottom:16px;color:var(--text)}
+.chart-sub{font-size:.7rem;color:var(--muted);margin-left:8px;font-weight:400}
+.trend-wrap{position:relative;width:100%}
+#trendCanvas{width:100%;display:block}
+
+/* SQUAD BAR CHART */
+.squad-list{display:flex;flex-direction:column;gap:7px}
+.squad-row{display:grid;grid-template-columns:200px 1fr 52px 52px 52px;align-items:center;gap:10px;padding:8px 12px;border-radius:9px;background:var(--card2);border:1px solid var(--border)}
+.squad-row:hover{border-color:var(--border2);background:#22232d}
+.squad-name{font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.squad-grp{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.squad-bar-track{height:8px;border-radius:4px;background:rgba(0,0,0,.3);overflow:hidden;position:relative}
+.squad-bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.squad-stat{font-family:var(--mono);font-size:.72rem;font-weight:600;text-align:center;color:var(--muted2)}
+.squad-stat.pct{color:#fff;font-weight:700}
+.sq-hdr{display:grid;grid-template-columns:200px 1fr 52px 52px 52px;gap:10px;padding:0 12px 8px;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+
+/* HEATMAP */
+.heatmap-squad{margin-bottom:24px}
+.heatmap-squad-title{
+  font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+  margin-bottom:8px;display:flex;align-items:center;gap:8px;
+}
+.heatmap-wrap{overflow-x:auto;padding-bottom:6px}
+.heatmap-wrap::-webkit-scrollbar{height:4px}
+.heatmap-wrap::-webkit-scrollbar-track{background:var(--border)}
+.heatmap-wrap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.heatmap-table{border-collapse:collapse;font-size:.7rem;white-space:nowrap}
+.heatmap-table th{
+  padding:4px 6px;font-weight:700;
+  font-family:var(--mono);font-size:.6rem;
+  color:var(--muted);text-align:center;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+}
+.heatmap-table th.player-col{text-align:left;min-width:160px;max-width:200px}
+.heatmap-table td{
+  padding:3px 4px;text-align:center;
+  border:1px solid rgba(0,0,0,.2);
+  font-family:var(--mono);font-size:.68rem;font-weight:600;
+  transition:opacity .1s;
+}
+.heatmap-table td.player-name{
+  text-align:left;padding:3px 10px 3px 6px;
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:600;
+  color:var(--text);background:var(--card);
+  border-right:2px solid var(--border2);min-width:160px;
+}
+.heatmap-table td.player-name .pid{font-size:.6rem;color:var(--muted);font-family:var(--mono);display:block;margin-top:1px}
+.heatmap-table td.stat-col{
+  background:var(--card);
+  border-left:2px solid var(--border2);
+  font-weight:700;
+}
+.cell-p{background:#14532d;color:#4ade80}
+.cell-a{background:#450a0a;color:#f87171}
+.cell-u{background:#18191f;color:#333}
+.cell-h{background:#1c1a07;color:#6b5a1a}
+.cell-pct-hi{background:#14532d;color:#fff}
+.cell-pct-mid{background:#422006;color:#fff}
+.cell-pct-lo{background:#450a0a;color:#fff}
+
+/* FILTER TABS */
+.filter-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.ftab{
+  padding:6px 14px;border-radius:8px;
+  border:1.5px solid var(--border);
+  background:transparent;
+  color:var(--muted2);font-family:'Outfit',sans-serif;
+  font-size:.75rem;font-weight:700;cursor:pointer;
+  transition:all .12s;
+}
+.ftab.on{border-color:currentColor}
+.ftab:hover:not(.on){background:var(--card2)}
+.ftab.all{color:var(--text)}.ftab.all.on{background:var(--card2);border-color:var(--border2)}
+.ftab.dev{color:var(--cdev)}.ftab.dev.on{background:rgba(251,146,60,.1)}
+.ftab.prepf{color:var(--cprepf)}.ftab.prepf.on{background:rgba(192,132,252,.1)}
+.ftab.u11{color:var(--cu11)}.ftab.u11.on{background:rgba(74,222,128,.1)}
+.ftab.o11{color:var(--co11)}.ftab.o11.on{background:rgba(250,204,21,.1)}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:var(--card2);border:1px solid var(--border2);
+  color:var(--text);padding:11px 22px;border-radius:30px;
+  font-size:.84rem;font-weight:600;z-index:999;
+  opacity:0;transition:opacity .25s;pointer-events:none;
+  white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+.toast.on{opacity:1}
+
+/* LEGEND */
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.leg{display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--muted2)}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+@media(max-width:700px){
+  #dashboard{padding:16px 14px 40px}
+  .topbar{padding:0 16px}
+  .squad-row{grid-template-columns:1fr 1fr;gap:6px}
+  .squad-stat{display:none}
+  .sq-hdr{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Junior Squads <span>·</span> Statistics</div>
+  <div id="topbarMeta" class="topbar-meta" style="display:none"></div>
+  <button class="topbar-load" onclick="triggerLoad()">📂 Load Stats File</button>
+</div>
+
+<!-- DROP ZONE -->
+<div id="dropZone">
+  <div class="drop-icon">📊</div>
+  <div class="drop-title">Attendance Statistics</div>
+  <div class="drop-sub">Load a stats JSON exported from the Junior Squads Attendance app to view charts and reports.</div>
+  <button class="drop-btn" onclick="triggerLoad()">📂 Choose File</button>
+  <div class="drop-hint">or drag & drop the .json file anywhere on this page</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- Season bar -->
+  <div class="season-bar">
+    <div>
+      <div class="season-bar-label">Season</div>
+      <div class="season-info" id="sbSeason">—</div>
+    </div>
+    <div>
+      <div class="season-bar-label">Coaching Weeks</div>
+      <div class="season-weeks" id="sbWeeks">—</div>
+    </div>
+    <div>
+      <div class="season-bar-label">Exported</div>
+      <div class="season-weeks" id="sbExported">—</div>
+    </div>
+    <div class="season-bar-right" id="trendGroupFilter"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="sec-title">Season Overview</div>
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- Group cards -->
+  <div class="sec-title">By Programme Group</div>
+  <div class="grp-row" id="grpRow"></div>
+
+  <!-- Trend chart -->
+  <div class="sec-title">Season Attendance Trend <span class="chart-sub" style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">weekly % present</span></div>
+  <div class="chart-card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px" id="trendFilter"></div>
+    <div class="trend-wrap">
+      <canvas id="trendCanvas" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Squad comparison -->
+  <div class="sec-title">Squad Comparison</div>
+  <div class="filter-tabs" id="squadFilter"></div>
+  <div class="chart-card" style="padding:16px">
+    <div class="sq-hdr">
+      <div>Squad</div><div>Attendance</div>
+      <div style="text-align:center">Present</div>
+      <div style="text-align:center">Absent</div>
+      <div style="text-align:center">Avg %</div>
+    </div>
+    <div class="squad-list" id="squadList"></div>
+  </div>
+
+  <!-- Player heatmap -->
+  <div class="sec-title">Player Attendance Heatmap</div>
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#14532d"></div>Present</div>
+    <div class="leg"><div class="leg-dot" style="background:#450a0a"></div>Absent</div>
+    <div class="leg"><div class="leg-dot" style="background:#1c1a07"></div>Holiday</div>
+    <div class="leg"><div class="leg-dot" style="background:#18191f"></div>Unmarked</div>
+  </div>
+  <div class="filter-tabs" id="heatmapFilter"></div>
+  <div id="heatmapOut"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".json" style="display:none">
+
+<script>
+'use strict';
+
+/* ── STATE ── */
+let SD=null; // stats data
+let trendGroupSel='all';
+let squadGroupSel='all';
+let heatmapGroupSel='all';
+
+const GROUPS=[
+  {id:'development',    label:'Development',       css:'dev',  color:'#fb923c'},
+  {id:'pre-performance',label:'Pre-Performance',   css:'prepf',color:'#c084fc'},
+  {id:'u11-performance',label:'U11 Performance',   css:'u11',  color:'#4ade80'},
+  {id:'o11-performance',label:'Over11 Performance',css:'o11',  color:'#facc15'},
+];
+const GRP_MAP=Object.fromEntries(GROUPS.map(g=>[g.id,g]));
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ── FILE LOAD ── */
+function triggerLoad(){document.getElementById('fileInput').click();}
+document.getElementById('fileInput').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  readFile(f);
+  e.target.value='';
+};
+// Drag and drop
+const body=document.body;
+body.addEventListener('dragover',e=>{e.preventDefault();document.getElementById('dropZone').classList.add('drag-over');});
+body.addEventListener('dragleave',e=>{if(!e.relatedTarget||e.relatedTarget===document.documentElement)document.getElementById('dropZone').classList.remove('drag-over');});
+body.addEventListener('drop',e=>{
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f&&(f.name.endsWith('.json')))readFile(f);
+  else toast('Please drop a .json stats file');
+});
+
+function readFile(f){
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.squads||!d.weeks)throw new Error('Not a valid stats export file');
+      SD=d;
+      showDashboard();
+    }catch(err){toast('Invalid file: '+err.message);}
+  };
+  r.readAsText(f);
+}
+
+/* ── RENDER DASHBOARD ── */
+function showDashboard(){
+  document.getElementById('dropZone').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('topbarMeta').style.display='block';
+
+  // Season bar
+  document.getElementById('sbSeason').textContent=`Sep ${SD.seasonYear} – Jul ${SD.seasonYear+1}`;
+  document.getElementById('sbWeeks').textContent=`${SD.weeks.length} active weeks (S-W01 – S-W${String(SD.weeks.length).padStart(2,'0')})`;
+  document.getElementById('sbExported').textContent=SD.exportedAt?new Date(SD.exportedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  document.getElementById('topbarMeta').innerHTML=`Season ${SD.seasonYear}/${String(SD.seasonYear+1).slice(2)}<br>${SD.weeks.length} weeks · ${SD.squads.length} squads`;
+
+  renderKPIs();
+  renderGroupCards();
+  renderTrendFilter();
+  renderTrend();
+  renderSquadFilter();
+  renderSquadList();
+  renderHeatmapFilter();
+  renderHeatmap();
+}
+
+/* ── KPIs ── */
+function renderKPIs(){
+  const allP=SD.squads.reduce((s,sq)=>s+sq.totalPresent,0);
+  const allA=SD.squads.reduce((s,sq)=>s+sq.totalAbsent,0);
+  const allPlayers=new Set(SD.squads.flatMap(sq=>sq.players.map(p=>p.id))).size;
+  const allSquads=SD.squads.length;
+  const pct=(allP+allA)>0?Math.round(allP/(allP+allA)*100):0;
+  // Highest and lowest attending squad
+  const ranked=[...SD.squads].filter(sq=>sq.totalPresent+sq.totalAbsent>0)
+    .sort((a,b)=>(b.totalPresent/(b.totalPresent+b.totalAbsent))-(a.totalPresent/(a.totalPresent+a.totalAbsent)));
+  const best=ranked[0];
+  const worst=ranked[ranked.length-1];
+
+  document.getElementById('kpiRow').innerHTML=`
+    <div class="kpi"><div class="kpi-n" style="color:var(--present)">${pct}%</div><div class="kpi-l">Season Average</div><div class="kpi-sub">${allP}P · ${allA}A recorded</div></div>
+    <div class="kpi"><div class="kpi-n">${allPlayers}</div><div class="kpi-l">Total Players</div><div class="kpi-sub">across ${allSquads} squads</div></div>
+    <div class="kpi"><div class="kpi-n">${SD.weeks.length}</div><div class="kpi-l">Coaching Weeks</div><div class="kpi-sub">S-W01 – S-W${String(SD.weeks.length).padStart(2,'0')}</div></div>
+    <div class="kpi"><div class="kpi-n">${allP+allA}</div><div class="kpi-l">Total Records</div><div class="kpi-sub">${allP} present · ${allA} absent</div></div>
+    ${best?`<div class="kpi"><div class="kpi-n" style="color:var(--present);font-size:1.3rem">${Math.round(best.totalPresent/(best.totalPresent+best.totalAbsent)*100)}%</div><div class="kpi-l">Best Squad</div><div class="kpi-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${best.name}</div></div>`:''}
+    ${worst&&worst!==best?`<div class="kpi"><div class="kpi-n" style="color:var(--absent);font-size:1.3rem">${Math.round(worst.totalPresent/(worst.totalPresent+worst.totalAbsent)*100)}%</div><div class="kpi-l">Needs Attention</div><div class="kpi-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${worst.name}</div></div>`:''}
+  `;
+}
+
+/* ── GROUP CARDS ── */
+function renderGroupCards(){
+  const grpStats=GROUPS.map(g=>{
+    const squads=SD.squads.filter(sq=>sq.groupId===g.id);
+    const p=squads.reduce((s,sq)=>s+sq.totalPresent,0);
+    const a=squads.reduce((s,sq)=>s+sq.totalAbsent,0);
+    const pct=(p+a)>0?Math.round(p/(p+a)*100):null;
+    const players=new Set(squads.flatMap(sq=>sq.players.map(pl=>pl.id))).size;
+    return{...g,squads:squads.length,players,p,a,pct};
+  }).filter(g=>g.squads>0);
+
+  document.getElementById('grpRow').innerHTML=grpStats.map(g=>{
+    const bgMap={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
+    const brdMap={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
+    return`<div class="grp-card" style="background:${bgMap[g.css]};border-color:${brdMap[g.css]}">
+      <div class="grp-card-top">
+        <div class="grp-card-name" style="color:${g.color}">${g.label}</div>
+        <div style="font-size:.7rem;color:rgba(255,255,255,.4);font-family:var(--mono)">${g.squads} squad${g.squads!==1?'s':''} · ${g.players} player${g.players!==1?'s':''}</div>
+      </div>
+      <div class="grp-card-pct">${g.pct!=null?g.pct+'%':'—'}</div>
+      <div class="grp-card-meta">${g.p} present · ${g.a} absent</div>
+      <div class="grp-bar-track"><div class="grp-bar-fill" style="width:${g.pct||0}%;background:${g.color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ── TREND CHART ── */
+function renderTrendFilter(){
+  const el=document.getElementById('trendFilter');
+  const grpsPresent=GROUPS.filter(g=>SD.squads.some(sq=>sq.groupId===g.id));
+  el.innerHTML=`<button class="ftab all ${trendGroupSel==='all'?'on':''}" onclick="setTrendGroup('all')">All Groups</button>`
+    +grpsPresent.map(g=>`<button class="ftab ${g.css} ${trendGroupSel===g.id?'on':''}" onclick="setTrendGroup('${g.id}')">${g.label}</button>`).join('');
+}
+function setTrendGroup(id){trendGroupSel=id;renderTrendFilter();renderTrend();}
+
+function renderTrend(){
+  const canvas=document.getElementById('trendCanvas');
+  const W=canvas.parentElement.offsetWidth||800;
+  const H=220;
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const weeks=SD.weeks;
+  const squads=trendGroupSel==='all'?SD.squads:SD.squads.filter(sq=>sq.groupId===trendGroupSel);
+
+  // Per-week attendance % across selected squads
+  const pts=weeks.map((wk,wi)=>{
+    let p=0,a=0;
+    squads.forEach(sq=>{
+      sq.players.forEach(pl=>{
+        const v=pl.weekData[wk];
+        if(v==='P')p++;else if(v==='A')a++;
+      });
+    });
+    return{wi,wk,p,a,pct:(p+a)>0?Math.round(p/(p+a)*100):null};
+  });
+
+  const PAD={t:20,r:20,b:36,l:42};
+  const cW=W-PAD.l-PAD.r;
+  const cH=H-PAD.t-PAD.b;
+  const n=weeks.length;
+  if(!n)return;
+
+  // Grid lines at 0,25,50,75,100
+  ctx.font=`500 10px 'JetBrains Mono',monospace`;
+  ctx.fillStyle='#5a5f72';
+  ctx.textAlign='right';
+  [0,25,50,75,100].forEach(v=>{
+    const y=PAD.t+cH*(1-v/100);
+    ctx.fillStyle='#2a2b33';
+    ctx.fillRect(PAD.l,y,cW,1);
+    ctx.fillStyle='#5a5f72';
+    ctx.fillText(v+'%',PAD.l-6,y+4);
+  });
+
+  // X axis week labels — show every Nth to avoid crowding
+  const step=Math.ceil(n/16);
+  ctx.textAlign='center';
+  ctx.fillStyle='#5a5f72';
+  pts.forEach(({wi,wk},i)=>{
+    if(i%step!==0&&i!==n-1)return;
+    const x=PAD.l+(i/(n-1||1))*cW;
+    const lbl=`S-W${String(i+1).padStart(2,'0')}`;
+    ctx.fillText(lbl,x,H-6);
+  });
+
+  // Area fill
+  const validPts=pts.filter(p=>p.pct!=null);
+  if(validPts.length<2)return;
+
+  // Gradient fill
+  const grad=ctx.createLinearGradient(0,PAD.t,0,PAD.t+cH);
+  grad.addColorStop(0,'rgba(34,197,94,.25)');
+  grad.addColorStop(1,'rgba(34,197,94,.02)');
+  ctx.beginPath();
+  validPts.forEach(({wi,pct},i)=>{
+    const x=PAD.l+(wi/(n-1||1))*cW;
+    const y=PAD.t+cH*(1-pct/100);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  });
+  const lastX=PAD.l+(validPts[validPts.length-1].wi/(n-1||1))*cW;
+  const firstX=PAD.l+(validPts[0].wi/(n-1||1))*cW;
+  ctx.lineTo(lastX,PAD.t+cH);
+  ctx.lineTo(firstX,PAD.t+cH);
+  ctx.closePath();
+  ctx.fillStyle=grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle='#22c55e';
+  ctx.lineWidth=2.5;
+  ctx.lineJoin='round';
+  ctx.lineCap='round';
+  validPts.forEach(({wi,pct},i)=>{
+    const x=PAD.l+(wi/(n-1||1))*cW;
+    const y=PAD.t+cH*(1-pct/100);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Dots at each point
+  validPts.forEach(({wi,pct})=>{
+    const x=PAD.l+(wi/(n-1||1))*cW;
+    const y=PAD.t+cH*(1-pct/100);
+    ctx.beginPath();
+    ctx.arc(x,y,3,0,Math.PI*2);
+    ctx.fillStyle='#22c55e';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x,y,1.5,0,Math.PI*2);
+    ctx.fillStyle='#0d0d10';
+    ctx.fill();
+  });
+
+  // Hover tooltip
+  canvas._pts=validPts.map(({wi,wk,pct,p,a})=>({
+    x:PAD.l+(wi/(n-1||1))*cW,
+    wk,wi,pct,p,a
+  }));
+}
+
+// Trend tooltip
+(function(){
+  const canvas=document.getElementById('trendCanvas');
+  let tipEl=null;
+  canvas.addEventListener('mousemove',e=>{
+    if(!canvas._pts)return;
+    const rect=canvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
+    let best=null,bestDist=Infinity;
+    canvas._pts.forEach(pt=>{
+      const d=Math.abs(pt.x-mx);
+      if(d<bestDist){bestDist=d;best=pt;}
+    });
+    if(!best||bestDist>30){hideTip();return;}
+    if(!tipEl){
+      tipEl=document.createElement('div');
+      tipEl.style.cssText='position:fixed;background:#1a1b22;border:1px solid #2e3040;border-radius:8px;padding:8px 12px;font-size:.75rem;pointer-events:none;z-index:200;line-height:1.6;font-family:Outfit,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.5)';
+      document.body.appendChild(tipEl);
+    }
+    tipEl.innerHTML=`<div style="font-weight:800;color:#fff;margin-bottom:2px">S-W${String(best.wi+1).padStart(2,'0')}</div><div style="color:#22c55e;font-weight:700">${best.pct}% present</div><div style="color:#5a5f72">${best.p} present · ${best.a} absent</div>`;
+    const bw=tipEl.offsetWidth||140,bh=tipEl.offsetHeight||70;
+    let tx=e.clientX+14,ty=e.clientY-bh/2;
+    if(tx+bw>window.innerWidth-8)tx=e.clientX-bw-14;
+    tipEl.style.left=tx+'px';tipEl.style.top=ty+'px';
+    tipEl.style.opacity='1';
+  });
+  canvas.addEventListener('mouseleave',hideTip);
+  function hideTip(){if(tipEl)tipEl.style.opacity='0';}
+})();
+
+/* ── SQUAD FILTER ── */
+function renderSquadFilter(){
+  const el=document.getElementById('squadFilter');
+  const grpsPresent=GROUPS.filter(g=>SD.squads.some(sq=>sq.groupId===g.id));
+  el.innerHTML=`<button class="ftab all ${squadGroupSel==='all'?'on':''}" onclick="setSquadGroup('all')">All Groups</button>`
+    +grpsPresent.map(g=>`<button class="ftab ${g.css} ${squadGroupSel===g.id?'on':''}" onclick="setSquadGroup('${g.id}')">${g.label}</button>`).join('');
+}
+function setSquadGroup(id){squadGroupSel=id;renderSquadFilter();renderSquadList();}
+
+/* ── SQUAD LIST ── */
+function renderSquadList(){
+  const squads=(squadGroupSel==='all'?SD.squads:SD.squads.filter(sq=>sq.groupId===squadGroupSel))
+    .map(sq=>{
+      const p=sq.totalPresent,a=sq.totalAbsent;
+      const pct=(p+a)>0?Math.round(p/(p+a)*100):null;
+      return{...sq,p,a,pct};
+    })
+    .sort((a,b)=>(b.pct||0)-(a.pct||0));
+
+  const g=GRP_MAP;
+  document.getElementById('squadList').innerHTML=squads.map(sq=>{
+    const grp=g[sq.groupId]||{color:'#6b6f7a',css:'dev',label:sq.groupId};
+    const pct=sq.pct;
+    const barColor=pct==null?'#2e3040':pct>=80?'#22c55e':pct>=60?'#fbbf24':'#f87171';
+    return`<div class="squad-row">
+      <div>
+        <div class="squad-name">${sq.name}</div>
+        <div class="squad-grp" style="color:${grp.color}">${grp.label}</div>
+      </div>
+      <div>
+        <div class="squad-bar-track">
+          <div class="squad-bar-fill" style="width:${pct||0}%;background:${barColor}"></div>
+        </div>
+        <div style="font-size:.6rem;color:var(--muted);font-family:var(--mono);margin-top:3px">${sq.p}P · ${sq.a}A · ${sq.players.length} players · ${SD.weeks.length} wks</div>
+      </div>
+      <div class="squad-stat">${sq.p}</div>
+      <div class="squad-stat">${sq.a}</div>
+      <div class="squad-stat pct" style="color:${barColor}">${pct!=null?pct+'%':'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── HEATMAP FILTER ── */
+function renderHeatmapFilter(){
+  const el=document.getElementById('heatmapFilter');
+  const grpsPresent=GROUPS.filter(g=>SD.squads.some(sq=>sq.groupId===g.id));
+  el.innerHTML=`<button class="ftab all ${heatmapGroupSel==='all'?'on':''}" onclick="setHeatmapGroup('all')">All Groups</button>`
+    +grpsPresent.map(g=>`<button class="ftab ${g.css} ${heatmapGroupSel===g.id?'on':''}" onclick="setHeatmapGroup('${g.id}')">${g.label}</button>`).join('');
+}
+function setHeatmapGroup(id){heatmapGroupSel=id;renderHeatmapFilter();renderHeatmap();}
+
+/* ── HEATMAP ── */
+function renderHeatmap(){
+  const squads=heatmapGroupSel==='all'?SD.squads:SD.squads.filter(sq=>sq.groupId===heatmapGroupSel);
+  const out=document.getElementById('heatmapOut');
+  if(!squads.length){out.innerHTML='<p style="color:var(--muted);font-size:.84rem">No squads in this group.</p>';return;}
+
+  const weeks=SD.weeks;
+  out.innerHTML=squads.map(sq=>{
+    const grp=GRP_MAP[sq.groupId]||{color:'#6b6f7a',label:sq.groupId};
+    const players=[...sq.players].sort((a,b)=>a.name.localeCompare(b.name));
+
+    const headerCells=weeks.map((_,i)=>`<th>S-W${String(i+1).padStart(2,'0')}</th>`).join('');
+    const rows=players.map(pl=>{
+      const p=pl.weekData?Object.values(pl.weekData).filter(v=>v==='P').length:0;
+      const a=pl.weekData?Object.values(pl.weekData).filter(v=>v==='A').length:0;
+      const pct=(p+a)>0?Math.round(p/(p+a)*100):null;
+      const pctClass=pct==null?'':pct>=80?'cell-pct-hi':pct>=60?'cell-pct-mid':'cell-pct-lo';
+      const cells=weeks.map(wk=>{
+        const v=pl.weekData?pl.weekData[wk]:null;
+        const cls=v==='P'?'cell-p':v==='A'?'cell-a':v==='H'?'cell-h':'cell-u';
+        const lbl=v==='P'?'P':v==='A'?'A':v==='H'?'·':'';
+        return`<td class="${cls}">${lbl}</td>`;
+      }).join('');
+      return`<tr>
+        <td class="player-name">${pl.name}${pl.playerID?`<span class="pid">${pl.playerID}</span>`:''}</td>
+        ${cells}
+        <td class="stat-col" style="color:#22c55e;font-size:.7rem">${p}</td>
+        <td class="stat-col" style="color:#f87171;font-size:.7rem">${a}</td>
+        <td class="stat-col ${pctClass}">${pct!=null?pct+'%':'—'}</td>
+      </tr>`;
+    }).join('');
+
+    return`<div class="heatmap-squad">
+      <div class="heatmap-squad-title">
+        <span style="width:8px;height:8px;border-radius:50%;background:${grp.color};display:inline-block;flex-shrink:0"></span>
+        <span style="color:${grp.color}">${sq.name}</span>
+        <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${sq.coach} · ${players.length} players</span>
+      </div>
+      <div class="heatmap-wrap">
+        <table class="heatmap-table">
+          <thead><tr>
+            <th class="player-col">Player</th>
+            ${headerCells}
+            <th style="color:#22c55e">P</th>
+            <th style="color:#f87171">A</th>
+            <th>%</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── TOAST ── */
+let _tt;
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');
+  clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('on'),2800);
+}
+
+// Redraw trend on resize
+let _rt;
+window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(SD)renderTrend();},120);});
+</script>
+</body>
+</html>
