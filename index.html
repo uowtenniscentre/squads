@@ -250,14 +250,25 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 
 @media(min-width:560px){.frow{flex-direction:row}}
 
-/* ── PORTRAIT LOCK — prompt to rotate if in portrait ── */
-#rotatePrompt{display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:20px}
-@media(orientation:portrait){
-  #rotatePrompt{display:flex}
+/* ── PORTRAIT LOCK — block app if tablet goes portrait ── */
+#rotatePrompt{
+  display:none;
+  position:fixed;inset:0;
+  background:#000;
+  z-index:99999;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  touch-action:none;
 }
-.rotate-icon{font-size:5rem;animation:spin90 1.5s ease-in-out infinite alternate}
-@keyframes spin90{from{transform:rotate(0deg)}to{transform:rotate(90deg)}}
-.rotate-msg{color:#fff;font-family:'Outfit',sans-serif;font-size:1.3rem;font-weight:600;letter-spacing:.05em;text-align:center;line-height:1.5}
+@media screen and (orientation:portrait){
+  #rotatePrompt{display:flex !important}
+  body{overflow:hidden !important}
+}
+.rotate-icon{font-size:6rem;animation:spin90 1.5s ease-in-out infinite alternate}
+@keyframes spin90{from{transform:rotate(-45deg)}to{transform:rotate(45deg)}}
+.rotate-msg{color:#fff;font-family:'Outfit',sans-serif;font-size:1.5rem;font-weight:600;letter-spacing:.05em;text-align:center;line-height:1.6;padding:0 30px}
 </style>
 </head>
 <body>
@@ -1667,10 +1678,24 @@ document.head.appendChild(_x);
 renderToday();
 // Check if weekly auto-backup should run today
 checkAutoBackup();
-// Attempt to lock orientation to landscape (works when installed as PWA)
+// Orientation lock — try API first, then fall back to manual overlay
+function checkOrientation(){
+  const prompt=document.getElementById('rotatePrompt');
+  if(!prompt)return;
+  if(window.innerHeight>window.innerWidth){
+    prompt.style.display='flex';
+  } else {
+    prompt.style.display='none';
+  }
+}
+// Try hard lock via API (works on some Android PWAs)
 if(screen.orientation&&screen.orientation.lock){
   screen.orientation.lock('landscape').catch(()=>{});
 }
+// Always add the visual fallback regardless
+window.addEventListener('resize',checkOrientation);
+window.addEventListener('orientationchange',checkOrientation);
+checkOrientation();
 
 </script>
 </body>
