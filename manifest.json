@@ -2,7 +2,7 @@
   "name": "Junior Squads Attendance",
   "short_name": "Squads",
   "description": "Tennis junior squads attendance register",
-  "start_url": "/squads/",
+  "start_url": "/squads/index.html",
   "scope": "/squads/",
   "display": "standalone",
   "orientation": "landscape",
