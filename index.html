@@ -1027,7 +1027,7 @@ function renderAttBody(){
   const pBar=(val,max,color,label,align)=>{
     const w=max>0?Math.max(Math.round((val/max)*100),0):0;
     const countTxt=`${val} / ${max}`;
-    const H=28; // bar height px
+    const H=18; // bar height px
     const chevW=14; // chevron notch width
     // Clip path: present bar clips right side to chevron >>; absent bar clips left side to chevron <<
     const uid=`pb_${Math.random().toString(36).slice(2,7)}`;
