@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<title>🎾 Junior Squads Attendance</title>
+<script>
+// Register Service Worker for offline caching (works when served from GitHub Pages)
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{
+  --gdk:#0a0a0c;--g:#3b82f6;--glg:#23252a;--lime:#3b82f6;--accent:#3b82f6;
+  --bg:#111114;--card:#1c1d22;--text:#e4e5ea;--muted:#6b6f7a;--border:#2a2b33;
+  --present:#22c55e;--absent:#f87171;--holiday:#fbbf24;
+  --cdev:#fb923c;--cprepf:#c084fc;--cu11:#4ade80;--co11:#facc15;
+  --r:14px;--sh:0 1px 6px rgba(0,0,0,.4),0 2px 14px rgba(0,0,0,.3);
+  --mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overscroll-behavior:none;display:flex;height:100dvh;overflow:hidden}
+
+/* ── SIDE NAV (144px wide) ── */
+.side-nav{width:144px;flex-shrink:0;background:#1a1b20;display:flex;flex-direction:column;align-items:center;padding:0 8px 16px;gap:4px;height:100dvh;overflow-y:auto;scrollbar-width:none;border-right:1px solid rgba(255,255,255,.07)}
+.side-nav::-webkit-scrollbar{display:none}
+/* Logo slot — black background, exactly 80px to align with top bar */
+.side-nav-logo{width:100%;height:80px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#000;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:8px;margin-left:-8px;margin-right:-8px;width:calc(100% + 16px)}
+.side-nav-logo-placeholder{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0}
+.cnb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:128px;padding:12px 8px 11px;border-radius:12px;border:none;cursor:pointer;transition:background .15s,color .15s;background:transparent;color:rgba(255,255,255,.4);font-family:'Outfit',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;text-align:center;line-height:1.2}
+.cnb svg{opacity:.4;transition:opacity .15s;width:28px;height:28px}
+.cnb.on{background:var(--accent);color:#fff}
+.cnb.on svg{opacity:1}
+.cnb:hover:not(.on){background:rgba(255,255,255,.07);color:rgba(255,255,255,.75)}
+.cnb:hover:not(.on) svg{opacity:.75}
+.cnb-divider{width:100px;height:1px;background:rgba(255,255,255,.08);margin:6px 0;flex-shrink:0}
+.cnb-admin{margin-top:auto}
+
+/* ── MAIN CONTENT AREA ── */
+.main-content{flex:1;overflow-y:auto;height:100dvh;min-width:0;background:var(--bg)}
+
+/* SCREENS — shown/hidden with display */
+.screen{display:none;padding:16px;max-width:900px;margin:0 auto;padding-bottom:48px}
+.screen.on{display:block}
+
+/* Top title bar — 80px, black bg, title centered */
+.title-topbar{background:#000;height:80px;padding:0 20px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;z-index:40;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;position:relative}
+.title-topbar-name{font-size:1.785rem;font-weight:400;color:#fff;letter-spacing:.268em;line-height:1;text-align:center;text-transform:uppercase}
+.title-topbar-date{font-size:.68rem;color:rgba(255,255,255,.32);font-family:var(--mono);position:absolute;right:20px;top:50%;transform:translateY(-50%)}
+
+/* ADMIN PANEL — full screen, shown/hidden via JS inline style */
+#adminPanel{position:fixed;inset:0;background:#111114;overflow-y:auto;z-index:100;display:none}
+.ap-hdr{background:#000;position:sticky;top:0;z-index:10;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08)}
+.ap-hdr-title{font-size:1rem;font-weight:800;color:#fff}
+.ap-close{padding:7px 14px;border-radius:9px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer}
+.ap-nav{display:flex;border-bottom:2px solid var(--border);background:#1c1d22;overflow-x:auto;scrollbar-width:none}
+.ap-nav::-webkit-scrollbar{display:none}
+.anb{flex-shrink:0;padding:11px 16px;font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;margin-bottom:-2px;white-space:nowrap}
+.anb.on{color:var(--accent);border-bottom-color:var(--accent)}
+.ap-page{display:none;padding:16px;max-width:900px;margin:0 auto;padding-bottom:48px}
+.ap-page.on{display:block}
+
+/* CARDS */
+.card{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);padding:16px;margin-bottom:12px;box-shadow:var(--sh)}
+.card.tight{padding:13px}
+.sec-lbl{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--present);margin-bottom:10px}
+.pg-title{font-size:1.1rem;font-weight:800;margin-bottom:14px;color:var(--text)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;border:none;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:transform .1s;white-space:nowrap;line-height:1}
+.btn:active{transform:scale(.95)}
+.btn-g{background:var(--lime);color:#000}
+.btn-outline{background:transparent;border:2px solid rgba(200,224,58,.5);color:var(--lime)}
+.btn-red{background:#dc2626;color:#fff}
+.btn-present{background:var(--present);color:#000}
+.btn-absent{background:var(--absent);color:#fff}
+.btn-excel{background:#1a5c3a;color:#fff}
+.btn-ghost{background:var(--card);color:var(--text);border:1.5px solid var(--border)}
+.btn-hol{background:transparent;border:2px solid var(--holiday);color:var(--holiday)}
+.btn-sm{padding:7px 13px;font-size:.8rem}
+.btn-xs{padding:5px 9px;font-size:.73rem}
+.btn-full{width:100%;justify-content:center}
+
+/* FORMS */
+.fg{margin-bottom:13px}
+.fl{font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:5px;display:block}
+.fi,.fs,.fta{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:'Outfit',sans-serif;font-size:.95rem;color:var(--text);background:#22232a;outline:none}
+.fi:focus,.fs:focus,.fta:focus{border-color:var(--g)}
+.fta{resize:vertical;min-height:88px;line-height:1.5}
+.frow{display:flex;gap:10px}
+.frow .fg{flex:1}
+
+/* GROUPS */
+.grp-sec{margin-bottom:16px}
+.grp-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;cursor:pointer;user-select:none;margin-bottom:8px}
+.grp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.grp-name{font-size:.95rem;font-weight:800;flex:1}
+.grp-cnt{font-size:.75rem;opacity:.6}
+.grp-arr{transition:transform .2s;opacity:.6}
+.grp-arr.open{transform:rotate(90deg)}
+.grp-body{display:none}
+.grp-body.open{display:block}
+.g-dev   .grp-hdr{background:#362516}.g-dev   .grp-dot{background:var(--cdev)}.g-dev   .grp-name{color:var(--cdev)}
+.g-prepf .grp-hdr{background:#2e1a3c}.g-prepf .grp-dot{background:var(--cprepf)}.g-prepf .grp-name{color:var(--cprepf)}
+.g-u11   .grp-hdr{background:#182e18}.g-u11   .grp-dot{background:var(--cu11)}.g-u11   .grp-name{color:var(--cu11)}
+.g-o11   .grp-hdr{background:#2e2a08}.g-o11   .grp-dot{background:var(--co11)}.g-o11   .grp-name{color:var(--co11)}
+
+/* SQUAD CARDS */
+.cls-card{background:var(--card);border:1.5px solid var(--border);border-radius:13px;padding:13px 15px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--sh);position:relative;overflow:hidden}
+.cls-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.g-dev   .cls-card{background:#29200a;border-color:#4a3214}.g-dev   .cls-card::before{background:var(--cdev)}
+.g-prepf .cls-card{background:#25123c;border-color:#482464}.g-prepf .cls-card::before{background:var(--cprepf)}
+.g-u11   .cls-card{background:#112614;border-color:#1e4020}.g-u11   .cls-card::before{background:var(--cu11)}
+.g-o11   .cls-card{background:#242208;border-color:#403e12}.g-o11   .cls-card::before{background:var(--co11)}
+.cls-name{font-size:.95rem;font-weight:700;padding-left:4px;color:var(--text)}
+.cls-meta{font-size:.74rem;color:var(--muted);margin-top:3px;padding-left:4px}
+.cls-meta strong{font-weight:800;color:var(--text)}
+.cls-badge{background:var(--g);color:#000;border-radius:20px;padding:4px 11px;font-size:.75rem;font-weight:700;flex-shrink:0}
+
+/* WEEK TABS */
+.wtabs-wrap{background:#1c1d22;border:1.5px solid var(--border);border-radius:13px;margin-bottom:12px;overflow:hidden}
+.wtabs-nav{display:flex;align-items:stretch;border-bottom:2px solid var(--border)}
+.wtabs-arrow{flex-shrink:0;width:34px;background:#161718;border:none;border-right:1px solid var(--border);cursor:pointer;font-size:1rem;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s}
+.wtabs-arrow:last-of-type{border-right:none;border-left:1px solid var(--border)}
+.wtabs-arrow:hover{background:var(--bg);color:var(--text)}
+.wtabs-arrow:active{transform:scale(.9)}
+.wtabs-scroll{display:flex;overflow-x:auto;scrollbar-width:none;flex:1}
+.wtabs-scroll::-webkit-scrollbar{display:none}
+.wtab{flex-shrink:0;padding:8px 14px;font-family:var(--mono);font-size:.65rem;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;color:#4a5568;white-space:nowrap;line-height:1.3;text-align:center;transition:color .12s,border-color .12s,background .12s}
+.wtab:hover{color:var(--text);background:#22232a}
+.wtab.sel{color:#fff;border-bottom-color:var(--lime);font-weight:800;background:#252630;border-radius:4px 4px 0 0;padding:13px 16px;font-size:.72rem}
+.wtab.hols{color:var(--holiday);background:#201e0c}
+.wtab.hols.sel{color:#000;border-bottom-color:var(--holiday);background:var(--holiday);font-weight:800;border-radius:4px 4px 0 0}
+.wtab.done{color:var(--accent);background:#0f1628}
+.wtab.done.sel{color:#fff;border-bottom-color:var(--accent);background:var(--accent);border-radius:4px 4px 0 0}
+.wtab.overdue{color:var(--absent);background:#221616}
+.wtab.overdue.sel{color:#fff;border-bottom-color:var(--absent);background:#991b1b;border-radius:4px 4px 0 0}
+.wtabs-legend{display:flex;gap:14px;padding:8px 14px;font-size:.64rem;color:var(--muted)}
+.wtabs-legend span{display:flex;align-items:center;gap:4px}
+.wleg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ATT HEADER — rendered inline via updateDateBanner() */
+
+/* STATS */
+.stat-row{display:flex;gap:8px;margin-bottom:12px}
+.stat-box{flex:1;background:var(--card);border-radius:12px;padding:12px 8px;text-align:center;border:1.5px solid var(--border)}
+.stat-n{font-size:1.7rem;font-weight:900;font-family:var(--mono);line-height:1}
+.stat-l{font-size:.63rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:4px}
+
+/* STUDENT ROW */
+.s-list{display:flex;flex-direction:column;gap:7px}
+.s-row{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);background:#1c1d22}
+.s-row.present{border-color:#166534;background:#161820}
+.s-row.absent{border-color:#7f1d1d;background:#221616}
+.s-info{display:flex;align-items:center;gap:9px}
+.s-gender{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem}
+.s-name{font-size:1.375rem;font-weight:600;color:var(--text);letter-spacing:.054em}
+.s-yr-inline{font-size:.72rem;color:var(--muted);font-family:var(--mono);margin-left:4px;font-weight:500}
+.att-btns{display:flex;gap:8px}
+.att-b{width:36px;height:36px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .1s}
+.att-b:active{transform:scale(.88)}
+
+/* HOL BANNER */
+.hol-banner{background:#1e1c0a;border:1.5px solid #4a3510;border-radius:var(--r);padding:28px 20px;text-align:center}
+
+/* STATS TABLE */
+.stbl{width:100%;border-collapse:collapse;font-size:.84rem}
+.stbl th{background:#1c1d22;color:var(--text);padding:9px 10px;text-align:left;font-size:.7rem;text-transform:uppercase;font-weight:700;border-bottom:2px solid var(--border)}
+.stbl td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+.stbl tr:last-child td{border-bottom:none}
+.bar-w{display:flex;align-items:center;gap:7px}
+.bar-bg{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+.bar-pct{font-family:var(--mono);font-size:.72rem;width:34px;font-weight:600;color:var(--text)}
+
+/* WEEKS GRID */
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.wtog{padding:8px 5px;border-radius:9px;border:1.5px solid var(--border);background:#1c1d22;font-size:.7rem;cursor:pointer;text-align:center;font-family:var(--mono);line-height:1.5;color:var(--text)}
+.wtog.on{background:var(--present);color:#000;border-color:var(--present)}
+.wtog.off{background:#201e0c;color:var(--holiday);border-color:#4a3510}
+
+/* ADMIN ITEMS */
+.ai{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border-radius:10px;border:1.5px solid var(--border);margin-bottom:7px;background:var(--card)}
+.ai-name{font-weight:700;font-size:.9rem;color:var(--text)}
+.ai-sub{font-size:.73rem;color:var(--muted);margin-top:2px}
+.ai-acts{display:flex;gap:5px;flex-shrink:0;margin-left:8px}
+
+/* BADGES */
+.gbadge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.68rem;font-weight:800}
+.gbadge.dev{background:#362516;color:var(--cdev)}
+.gbadge.prepf{background:#2e1a3c;color:var(--cprepf)}
+.gbadge.u11{background:#182e18;color:var(--cu11)}
+.gbadge.o11{background:#2e2a08;color:var(--co11)}
+
+/* DATA CARDS */
+.data-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:12px}
+.data-card-title{font-size:1rem;font-weight:800;margin-bottom:5px;color:var(--text)}
+.data-card-desc{font-size:.81rem;color:var(--muted);line-height:1.5;margin-bottom:13px}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:flex-end;justify-content:center}
+.modal-bg.on{display:flex}
+.modal{background:#1c1d22;border-radius:22px 22px 0 0;padding:22px 20px 36px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;animation:su .22s ease}
+@keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-grab{width:40px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 18px}
+.modal-title{font-size:1.1rem;font-weight:800;margin-bottom:18px;color:var(--text)}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* MISC */
+.back-btn{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;font-weight:700;color:var(--accent);cursor:pointer;padding:8px 0 10px;border:none;background:none;font-family:'Outfit',sans-serif}
+.note-card{margin-bottom:9px;padding:11px 13px;background:#161718;border-radius:10px;border-left:3px solid var(--present)}
+.note-wk{font-size:.7rem;color:var(--muted);font-family:var(--mono);margin-bottom:3px}
+.note-txt{font-size:.86rem;line-height:1.5;color:var(--text)}
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty .ico{font-size:3rem;margin-bottom:12px}
+.empty p{font-size:.88rem;line-height:1.6}
+.sync-box{background:#172018;border:1.5px solid #1a5c3a;border-radius:12px;padding:14px 16px;font-size:.83rem;line-height:1.6;margin-bottom:14px;color:var(--text)}
+.search-wrap{position:relative;margin-bottom:14px}
+.search-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.search-in{width:100%;padding:10px 14px 10px 38px;border:1.5px solid var(--border);border-radius:10px;font-family:'Outfit',sans-serif;font-size:.92rem;background:#1c1d22;outline:none;color:var(--text)}
+.search-in:focus{border-color:var(--g)}
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1c1d22;border:1px solid var(--border);color:var(--text);padding:11px 22px;border-radius:30px;font-size:.84rem;font-weight:600;z-index:999;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.toast.on{opacity:1}
+
+/* TODAY */
+.today-hero{background:#111;border:1.5px solid var(--border);border-radius:var(--r);padding:10px 16px;margin-bottom:16px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.today-sec-title{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:10px}
+.today-none{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:30px 20px;text-align:center;color:var(--muted)}
+
+/* Password screen dark */
+#pwScreen{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:none;align-items:center;justify-content:center}
+#pwScreen.on{display:flex}
+.pw-box{background:#1c1d22;border:1.5px solid var(--border);border-radius:20px;padding:32px 28px;width:88%;max-width:320px;text-align:center}
+.pw-icon{font-size:2.5rem;margin-bottom:12px}
+.pw-title{font-size:1.1rem;font-weight:800;margin-bottom:4px;color:var(--text)}
+.pw-sub{font-size:.84rem;color:var(--muted);margin-bottom:18px}
+.pw-inp{width:100%;padding:12px 16px;border:2px solid var(--border);border-radius:12px;font-family:'Outfit',sans-serif;font-size:1.2rem;text-align:center;outline:none;margin-bottom:6px;background:#111114;color:var(--text)}
+.pw-inp:focus{border-color:var(--g)}
+.pw-err{font-size:.8rem;color:var(--absent);min-height:18px;margin-bottom:10px}
+.pw-btns{display:flex;gap:8px}
+
+@media(min-width:560px){.frow{flex-direction:row}}
+</style>
+</head>
+<body>
+
+<!-- SIDE NAV -->
+<nav class="side-nav">
+  <div class="side-nav-logo">
+    <div class="side-nav-logo-placeholder">🎾</div>
+  </div>
+  <button class="cnb on" id="cnb-today" onclick="showScreen('today')">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none"/></svg>
+    Today
+  </button>
+  <button class="cnb" id="cnb-squads" onclick="showScreen('classes')">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="18" cy="8" r="2.5"/><path d="M21 21v-1.5a3 3 0 0 0-2-2.83"/></svg>
+    Squads
+  </button>
+  <div class="cnb-divider"></div>
+  <button class="cnb cnb-admin" onclick="openPw()">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
+    Admin
+  </button>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+  <div class="title-topbar">
+    <span class="title-topbar-name">Junior Squads Attendance</span>
+    <span class="title-topbar-date" id="hdrDate"></span>
+  </div>
+
+<!-- TODAY SCREEN -->
+<div class="screen on" id="sc-today">
+  <div class="today-hero" id="todayHero"></div>
+  <div class="today-sec-title" id="todayLbl"></div>
+  <div id="todayList"></div>
+</div>
+
+<!-- CLASSES SCREEN -->
+<div class="screen" id="sc-classes">
+  <div id="v-list">
+    <div class="search-wrap">
+      <span class="search-ico">🔍</span>
+      <input class="search-in" id="classSearch" placeholder="Search squads…" oninput="renderGroups()">
+    </div>
+    <div id="grpCon"></div>
+  </div>
+  <div id="v-att" style="display:none">
+    <button class="back-btn" onclick="backToList()">← All Squads</button>
+    <div id="attHdr"></div>
+    <div class="wtabs-wrap">
+      <div class="wtabs-nav">
+        <button class="wtabs-arrow" id="wArrowL" onclick="shiftWeek(-1)">‹</button>
+        <div class="wtabs-scroll" id="wstrip"></div>
+        <button class="wtabs-arrow" id="wArrowR" onclick="shiftWeek(1)">›</button>
+      </div>
+      <div class="wtabs-legend">
+        <span><span class="wleg-dot" style="background:#4a5568"></span>Selected</span>
+        <span><span class="wleg-dot" style="background:#4ade80"></span>Done</span>
+        <span><span class="wleg-dot" style="background:#f87171"></span>Missing</span>
+        <span><span class="wleg-dot" style="background:#fbbf24"></span>Holiday</span>
+        <span style="margin-left:auto"><button onclick="goToday()" style="padding:3px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--card);font-family:'Outfit',sans-serif;font-size:.65rem;font-weight:700;cursor:pointer;color:var(--text)">📅 This week</button></span>
+      </div>
+    </div>
+    <div id="attBody"></div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL (shown/hidden via JS) -->
+<div id="adminPanel">
+  <div class="ap-hdr">
+    <div class="ap-hdr-title">⚙️ Admin Panel</div>
+    <button class="ap-close" onclick="closeAdmin()">✕ Close</button>
+  </div>
+  <nav class="ap-nav" id="apNav">
+    <button class="anb" id="anb-stats"    onclick="goAdmin('stats')">📊 Stats</button>
+    <button class="anb" id="anb-classes"  onclick="goAdmin('classes')">🎾 Squads</button>
+    <button class="anb" id="anb-children" onclick="goAdmin('children')">👦 Children</button>
+    <button class="anb" id="anb-holidays" onclick="goAdmin('holidays')">🗓 Holidays</button>
+    <button class="anb" id="anb-data"     onclick="goAdmin('data')">💾 Data</button>
+  </nav>
+
+  <!-- ap: STATS -->
+  <div class="ap-page" id="ap-stats">
+    <div class="pg-title" style="margin-top:16px">Attendance Stats</div>
+    <div class="frow" style="margin-bottom:14px">
+      <div class="fg" style="margin-bottom:0">
+        <label class="fl">Group</label>
+        <select class="fs" id="st-grp" onchange="statsGrpChg()">
+          <option value="">All groups</option>
+          <option value="development">Development</option>
+          <option value="pre-performance">Pre-Performance</option>
+          <option value="u11-performance">U11 Performance</option>
+          <option value="o11-performance">Over11 Performance</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label class="fl">Squad</label>
+        <select class="fs" id="st-cls" onchange="renderStats()">
+          <option value="">— pick a squad —</option>
+        </select>
+      </div>
+    </div>
+    <div id="statsOut"></div>
+  </div>
+
+  <!-- ap: CLASSES -->
+  <div class="ap-page" id="ap-classes">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0;margin-bottom:12px">
+      <div class="pg-title" style="margin-bottom:0">Squads</div>
+      <button class="btn btn-g btn-sm" onclick="openClsMod()">+ Add Squad</button>
+    </div>
+    <div style="padding:0 16px"><div id="adClsList"></div></div>
+  </div>
+
+  <!-- ap: CHILDREN -->
+  <div class="ap-page" id="ap-children">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0;margin-bottom:12px">
+      <div class="pg-title" style="margin-bottom:0">Children</div>
+      <button class="btn btn-g btn-sm" onclick="openChMod()">+ Add Child</button>
+    </div>
+    <div style="padding:0 16px">
+      <div class="frow" style="margin-bottom:12px">
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl">Filter — Group</label>
+          <select class="fs" id="adChGrpFil" onchange="syncChFil()">
+            <option value="">All groups</option>
+            <option value="development">Development</option>
+            <option value="pre-performance">Pre-Performance</option>
+            <option value="u11-performance">U11 Performance</option>
+            <option value="o11-performance">Over11 Performance</option>
+          </select>
+        </div>
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl">Filter — Squad</label>
+          <select class="fs" id="adChClsFil" onchange="renderAdCh()">
+            <option value="">All squads</option>
+          </select>
+        </div>
+      </div>
+      <div id="adChList"></div>
+    </div>
+  </div>
+
+  <!-- ap: HOLIDAYS -->
+  <div class="ap-page" id="ap-holidays">
+    <div style="padding:16px 16px 0">
+      <div class="pg-title">Holiday & Week Settings</div>
+      <p style="font-size:.82rem;color:var(--muted);line-height:1.6;margin-bottom:14px"><strong style="color:var(--text)">Green = active.</strong> Amber = holiday — won't count as missed attendance.</p>
+      <div class="card tight">
+        <div class="sec-lbl">⚙️ Season (September – July)</div>
+        <div class="frow">
+          <div class="fg">
+            <label class="fl">Start Year (September)</label>
+            <input class="fi" type="number" id="sy" value="2025" min="2020" max="2035" onchange="rebuildWeeks()">
+          </div>
+          <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:13px">
+            <span id="activeCnt" style="font-size:.82rem;color:var(--muted);font-weight:600"></span>
+          </div>
+        </div>
+        <div id="seasonRangeLabel" style="font-size:.76rem;color:var(--muted);margin-top:-8px;margin-bottom:4px"></div>
+      </div>
+      <div class="card">
+        <div class="sec-lbl">🗓 Weeks — tap to toggle</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn btn-sm btn-outline" onclick="setAllW(true)">All Active</button>
+          <button class="btn btn-sm btn-outline" onclick="setAllW(false)">Clear All</button>
+        </div>
+        <div class="wgrid" id="wgrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ap: DATA -->
+  <div class="ap-page" id="ap-data">
+    <div style="padding:16px 16px 0">
+      <div class="pg-title">Data & Export</div>
+      <div class="data-card" style="border-color:var(--accent)">
+        <div class="data-card-title">📲 Fullscreen App</div>
+        <div class="data-card-desc">
+          This app is installed as a fullscreen PWA via GitHub Pages.<br>
+          If Chrome shows an install banner — tap <strong style="color:var(--text)">Install</strong>.<br>
+          To reinstall: tap <strong style="color:var(--text)">⋮ menu → Add to Home Screen</strong> in Chrome.
+        </div>
+      </div>
+      <div class="data-card">
+        <div class="data-card-title">⬇️ Export to Excel</div>
+        <div class="data-card-desc">One sheet per squad grouped by programme, All Coach Notes sheet, and Summary sheet. Needs internet once to load the Excel library.</div>
+        <button class="btn btn-excel btn-full" onclick="exportExcel()">⬇ Download Excel File</button>
+      </div>
+      <div class="data-card" style="border-color:#a5b4fc">
+        <div class="data-card-title">📋 Import Squads from Excel</div>
+        <div class="data-card-desc">Upload an Excel file with a sheet named <strong>Squads</strong> with columns: <em>Group, Squad name, Coaches, Weekday</em>. Only new squads are added — existing ones are not overwritten.</div>
+        <button class="btn btn-full" style="background:#4338ca;color:#fff" onclick="importSquadsXlsx()">📋 Import Squads from Excel</button>
+      </div>
+      <div class="data-card" style="border-color:#86efac">
+        <div class="data-card-title">👦 Import Players from Excel</div>
+        <div class="data-card-desc">Upload the same Excel file with a sheet named <strong>Players</strong> with columns: <em>ID, Last name, First Name, Birth Year, Gender, Squad1…Squad5</em>. Only new players are added — existing ones (matched by ID or name) are not overwritten.</div>
+        <button class="btn btn-full" style="background:#1a5c3a;color:#fff" onclick="importPlayersXlsx()">👦 Import Players from Excel</button>
+      </div>
+      <div class="data-card" style="border-color:var(--accent)">
+        <div class="data-card-title">🔄 Automatic Weekly Backup</div>
+        <div class="data-card-desc" id="autoBackupStatus">Checking backup status…</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <label style="font-size:.78rem;font-weight:700;color:var(--muted)">Backup day:</label>
+          <select class="fs" id="autoBackupDay" onchange="saveAutoBackupDay()" style="flex:1;min-width:120px;padding:7px 12px;font-size:.85rem">
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+            <option value="0">Sunday</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-full btn-sm" onclick="runAutoBackup(true)">🔄 Run Backup Now</button>
+      </div>
+      <div class="data-card">
+        <div class="data-card-title">📤 Export Backup</div>
+        <div class="data-card-desc">Save all data as JSON. Use to transfer setup from MacBook to tablet, or keep a backup.</div>
+        <button class="btn btn-outline btn-full" onclick="exportJSON()">📤 Export Backup JSON</button>
+      </div>
+      <div class="data-card">
+        <div class="data-card-title">📥 Import Backup</div>
+        <div class="data-card-desc">Import a backup JSON. Squads and children will be updated; existing attendance on this device is kept.</div>
+        <button class="btn btn-outline btn-full" onclick="importJSON()">📥 Import Backup JSON</button>
+      </div>
+      <div class="data-card" style="border-color:#fca5a5">
+        <div class="data-card-title" style="color:#b91c1c">🗑 Delete All Data</div>
+        <div class="data-card-desc">Permanently deletes everything from this device. Cannot be undone.</div>
+        <button class="btn btn-red btn-full" onclick="nukeAll()">Delete All Data</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /.main-content -->
+
+<!-- PASSWORD SCREEN (shown/hidden via JS) -->
+<div id="pwScreen">
+  <div class="pw-box">
+    <div class="pw-icon">🔒</div>
+    <div class="pw-title">Admin Access</div>
+    <div class="pw-sub">Enter password to continue</div>
+    <input class="pw-inp" type="password" id="pwInp" placeholder="Password" maxlength="30"
+           onkeydown="if(event.key==='Enter')submitPw()">
+    <div class="pw-err" id="pwErr"></div>
+    <div class="pw-btns">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="cancelPw()">Cancel</button>
+      <button class="btn btn-g btn-sm"     style="flex:1" onclick="submitPw()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-bg" id="mCls">
+  <div class="modal">
+    <div class="modal-grab"></div>
+    <div class="modal-title" id="mClsTit">Add Squad</div>
+    <div class="fg"><label class="fl">Group *</label>
+      <select class="fs" id="mc_grp">
+        <option value="development">Development</option>
+        <option value="pre-performance">Pre-Performance</option>
+        <option value="u11-performance">U11 Performance</option>
+        <option value="o11-performance">Over11 Performance</option>
+      </select></div>
+    <div class="fg"><label class="fl">Squad Name * <span style="font-weight:400;color:var(--muted)">[ e.g. Dev Red | Saturday | 9:00am | ]</span></label>
+      <input class="fi" id="mc_name" placeholder="e.g. Dev Red | Saturday | 9:00am |"></div>
+    <div class="fg"><label class="fl">Coaches Names *</label>
+      <input class="fi" id="mc_coach" placeholder="e.g. Sarah Johnson, Mike Davies"></div>
+    <div class="fg"><label class="fl">Day of Week</label>
+      <select class="fs" id="mc_day">
+        <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+        <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+      </select></div>
+    <input type="hidden" id="mc_id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeMod('mCls')">Cancel</button>
+      <button class="btn btn-g btn-sm"     onclick="saveCls()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="mCh">
+  <div class="modal">
+    <div class="modal-grab"></div>
+    <div class="modal-title" id="mChTit">Add Child</div>
+    <div class="fg"><label class="fl">Full Name *</label>
+      <input class="fi" id="ch_name" placeholder="e.g. Emma Thompson"></div>
+    <div class="fg"><label class="fl">Birth Year *</label>
+      <input class="fi" id="ch_yr" type="number" placeholder="2015" min="2000" max="2025"></div>
+    <div class="fg"><label class="fl">Player ID <span style="font-weight:400;color:var(--muted)">(7-digit payment ref, optional)</span></label>
+      <input class="fi" id="ch_pid" type="text" inputmode="numeric" placeholder="e.g. 4300746" maxlength="7" pattern="[0-9]{7}"></div>
+    <div class="fg"><label class="fl">Gender *</label>
+      <div style="display:flex;gap:10px">
+        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--text)" id="gLblM">
+          <input type="radio" name="ch_gender" id="ch_gm" value="m" style="width:16px;height:16px;accent-color:#60a5fa" checked>
+          <svg width="22" height="22" viewBox="0 0 660 656" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g transform="matrix(1,0,0,1,-1887.36,-1522.83)"><g transform="matrix(1,0,0,1,12.2427,784.785)"><path d="M2154.62,1393.59C1995.63,1369.26 1874.14,1231.32 1875.13,1065.76C1876.2,883.815 2024.8,736.971 2206.75,738.049C2388.7,739.127 2535.54,887.721 2534.46,1069.67C2533.49,1234.39 2411.61,1370.34 2253.54,1393.81C2274.62,1364.29 2349.09,1200.51 2405.16,1095.08C2412.68,1034.12 2355.51,1024.54 2355.51,1024.54L2043.43,1023.53C2043.43,1023.53 1996.66,1028.86 1998.03,1093.39C2035.76,1178.24 2121.11,1337.51 2149.96,1387.85C2151.18,1389.97 2152.75,1391.88 2154.62,1393.59ZM2200.3,807.338C2254.19,807.338 2297.95,851.094 2297.95,904.988C2297.95,958.882 2254.19,1002.64 2200.3,1002.64C2146.4,1002.64 2102.65,958.882 2102.65,904.988C2102.65,851.094 2146.4,807.338 2200.3,807.338Z" style="fill:rgb(76,124,215);"/></g></g></svg>
+          Male
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--text)" id="gLblF">
+          <input type="radio" name="ch_gender" id="ch_gf" value="f" style="width:16px;height:16px;accent-color:#f472b6">
+          <svg width="22" height="22" viewBox="0 0 660 600" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g transform="matrix(1,0,0,1,-1011.12,-1522.83)"><g transform="matrix(1,0,0,1,14.0165,784.785)"><path d="M1135.85,1334.02C1159.45,1350.98 989.876,1241.58 997.338,1065.76C1005.05,883.976 1147.01,736.971 1328.96,738.049C1510.91,739.127 1660.95,887.768 1656.67,1069.67C1652.11,1263.8 1479.59,1359.16 1516.19,1333.7C1457.08,1222.55 1372.92,1050.7 1357.02,1035.53C1346.58,1025.56 1298.21,1015.98 1282.59,1043.24C1253.73,1093.57 1173.59,1249.17 1135.85,1334.02ZM1322.51,807.338C1376.4,807.338 1420.16,851.094 1420.16,904.988C1420.16,958.882 1376.4,1002.64 1322.51,1002.64C1268.61,1002.64 1224.86,958.882 1224.86,904.988C1224.86,851.094 1268.61,807.338 1322.51,807.338Z" style="fill:rgb(229,81,141);"/></g></g></svg>
+          Female
+        </label>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Assigned Squads *</label>
+      <div id="chClsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addChClsRow()">+ Add Squad</button>
+    </div>
+    <input type="hidden" id="ch_id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeMod('mCh')">Cancel</button>
+      <button class="btn btn-g btn-sm"     onclick="saveCh()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ── CONSTANTS ── */
+const GROUPS=[
+  {id:'development',     label:'Development',      css:'dev',  prefix:'DEV' },
+  {id:'pre-performance', label:'Pre-Performance',  css:'prepf',prefix:'PRE' },
+  {id:'u11-performance', label:'U11 Performance',  css:'u11',  prefix:'U11' },
+  {id:'o11-performance', label:'Over11 Performance',css:'o11', prefix:'O11' },
+];
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const PW='Tennis';
+
+/* ── DATA ── */
+let D={classes:[],children:[],attendance:{},activeWeeks:[],seasonYear:2025};
+function loadD(){
+  try{const r=localStorage.getItem('ta_v10');if(r)D=JSON.parse(r);}catch(e){}
+  // Migrate old single classId → classIds array
+  D.children=D.children.map(c=>{
+    if(!c.classIds){c.classIds=c.classId?[c.classId]:[];delete c.classId;}
+    return c;
+  });
+  if(!D.activeWeeks||!D.activeWeeks.length)initWeeks();
+}
+function saveD(){
+  try{localStorage.setItem('ta_v10',JSON.stringify(D));}
+  catch(e){toast('Storage full — export backup!');}
+}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+/* ── WEEK UTILS ── */
+function toWK(d){
+  const u=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=u.getUTCDay()||7;u.setUTCDate(u.getUTCDate()+4-day);
+  const ys=new Date(Date.UTC(u.getUTCFullYear(),0,1));
+  const w=Math.ceil(((u-ys)/86400000+1)/7);
+  return `${u.getUTCFullYear()}-W${String(w).padStart(2,'0')}`;
+}
+function wkDate(wk){
+  const[y,w]=wk.split('-W');
+  const s=new Date(+y,0,1+(+w-1)*7);
+  const dow=s.getDay();
+  if(dow<=4)s.setDate(s.getDate()-s.getDay()+1);
+  else s.setDate(s.getDate()+8-s.getDay());
+  return s;
+}
+function wkLbl(wk){const d=wkDate(wk);return `${d.getDate()} ${MONTHS[d.getMonth()]}`;}
+function addWks(wk,n){const d=wkDate(wk);d.setDate(d.getDate()+n*7);return toWK(d);}
+function allY(y){const r=[];for(let w=1;w<=52;w++)r.push(`${y}-W${String(w).padStart(2,'0')}`);return r;}
+function seasonWks(y){
+  const all=[...allY(y),...allY(y+1)];
+  const s=toWK(new Date(y,8,1)),e=toWK(new Date(y+1,6,31));
+  const seen=new Set();
+  return all.filter(w=>{if(seen.has(w))return false;seen.add(w);return w>=s&&w<=e;});
+}
+function initWeeks(){D.activeWeeks=seasonWks(D.seasonYear||2025);saveD();}
+
+/* ── PASSWORD ── */
+// pwScreen uses plain display style — no class toggling
+function openPw(){
+  document.getElementById('pwInp').value='';
+  document.getElementById('pwErr').textContent='';
+  document.getElementById('pwScreen').style.display='flex';
+  setTimeout(()=>document.getElementById('pwInp').focus(),200);
+}
+function submitPw(){
+  const v=document.getElementById('pwInp').value;
+  if(v===PW){
+    document.getElementById('pwScreen').style.display='none';
+    openAdmin();
+  }else{
+    document.getElementById('pwErr').textContent='Incorrect password — try again.';
+    document.getElementById('pwInp').value='';
+  }
+}
+function cancelPw(){
+  document.getElementById('pwScreen').style.display='none';
+}
+
+/* ── ADMIN PANEL ── */
+let adminOpen=false;
+function openAdmin(){
+  adminOpen=true;
+  document.getElementById('adminPanel').style.display='block';
+  document.getElementById('adminPanel').scrollTop=0;
+  goAdmin('stats');
+}
+function closeAdmin(){
+  adminOpen=false;
+  document.getElementById('adminPanel').style.display='none';
+}
+function goAdmin(p){
+  // hide all ap-pages
+  document.querySelectorAll('.ap-page').forEach(x=>x.style.display='none');
+  // deactivate all anb buttons
+  document.querySelectorAll('.anb').forEach(x=>x.classList.remove('on'));
+  // show target page
+  document.getElementById('ap-'+p).style.display='block';
+  // activate target button
+  const btn=document.getElementById('anb-'+p);
+  if(btn)btn.classList.add('on');
+  // render content
+  if(p==='stats')    initStats();
+  if(p==='classes')  renderAdCls();
+  if(p==='children'){populateChFil();renderAdCh();}
+  if(p==='holidays') renderCal();
+  if(p==='data')     renderAutoBackupCard();
+}
+
+/* ── COACH SCREEN ROUTING ── */
+function showScreen(s){
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.cnb').forEach(x=>x.classList.remove('on'));
+  document.getElementById('sc-'+s).classList.add('on');
+  const btnId=s==='today'?'cnb-today':'cnb-squads';
+  const btn=document.getElementById(btnId);
+  if(btn)btn.classList.add('on');
+  // Always reset attendance view back to squad list
+  if(selCls){
+    selCls=null;selWk=null;
+    document.getElementById('v-att').style.display='none';
+    document.getElementById('v-list').style.display='block';
+  }
+  if(s==='today')  renderToday();
+  if(s==='classes')renderGroups();
+}
+
+/* ── TODAY ── */
+function renderToday(){
+  const now=new Date();
+  const dn=DAYNAMES[now.getDay()];
+  const wk=toWK(now);
+  const isAct=D.activeWeeks.includes(wk);
+  const calDay=now.getDate();
+  const calMonth=MONTHS[now.getMonth()].toUpperCase();
+  // Same calendar icon style as attendance cards
+  const calIconToday=`<svg width="76" height="76" viewBox="0 0 76 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="cst" x="-15%" y="-15%" width="130%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0006"/></filter></defs>
+    <rect x="1" y="1" width="74" height="74" rx="12" fill="#ffffff" filter="url(#cst)"/>
+    <rect x="1" y="1" width="74" height="26" rx="12" fill="#dc2626"/>
+    <rect x="1" y="14" width="74" height="13" fill="#dc2626"/>
+    <text x="38" y="14" text-anchor="middle" dominant-baseline="central" font-family="Outfit,sans-serif" font-size="17.5" font-weight="800" fill="#fff" letter-spacing="2">${calMonth}</text>
+    <text x="38" y="53" text-anchor="middle" dominant-baseline="middle" font-family="Outfit,sans-serif" font-size="34" font-weight="900" fill="#111111">${calDay}</text>
+  </svg>`;
+  const activeLabel=isAct
+    ?`<span style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:20px;padding:4px 14px;font-size:1.1rem;font-weight:700;font-family:var(--mono)">Active · ${wk}</span>`
+    :`<span style="background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:20px;padding:4px 14px;font-size:1.1rem;font-weight:700;font-family:var(--mono)">Holiday · ${wk}</span>`;
+  document.getElementById('todayHero').innerHTML=`
+    <div style="display:flex;align-items:center;gap:14px;flex:1">
+      ${calIconToday}
+      <div style="font-size:2.7rem;font-weight:900;color:#fff;line-height:1">${dn}</div>
+    </div>
+    <div style="flex-shrink:0;text-align:right">${activeLabel}</div>`;
+  const lbl=document.getElementById('todayLbl');
+  const lst=document.getElementById('todayList');
+  if(!D.classes.length){
+    lbl.textContent='';
+    lst.innerHTML=`<div class="today-none" style="padding:40px 20px">
+      <p style="font-size:3.52rem;line-height:1.3;color:var(--text);font-weight:600">No <span style="color:var(--accent)">Squads</span> yet.<br><span style="font-size:1.1rem;color:var(--muted);font-weight:400">Go to Admin to add squads.</span></p>
+    </div>`;
+    return;
+  }
+  if(!isAct){
+    lbl.textContent='';
+    lst.innerHTML=`<div class="today-none" style="background:#1e1c0a;border-color:#4a3510;padding:40px 20px">
+      <p style="font-size:3.52rem;line-height:1.3;color:#fbbf24;font-weight:600">Holiday week.<br><span style="font-size:1.1rem;color:rgba(251,191,36,.6);font-weight:400">No <span style="color:var(--accent)">Squads</span> running.</span></p>
+    </div>`;
+    return;
+  }
+  const tc=D.classes.filter(c=>c.day===dn);
+  if(!tc.length){
+    lbl.textContent='';
+    lst.innerHTML=`<div class="today-none" style="padding:40px 20px">
+      <p style="font-size:3.52rem;line-height:1.3;color:var(--text);font-weight:600">No <span style="color:var(--accent)">Squads</span> today.<br><span style="font-size:1.1rem;color:var(--muted);font-weight:400">Use the Squads tab for other days.</span></p>
+    </div>`;
+    return;
+  }
+  lbl.textContent=`${tc.length} squad${tc.length!==1?'s':''} today`;
+  let html='';
+  GROUPS.forEach(g=>{
+    const gc=tc.filter(c=>c.group===g.id);
+    if(!gc.length)return;
+    html+=`<div class="grp-sec g-${g.css}" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+        <div class="grp-dot"></div>
+        <span class="grp-name" style="font-size:.74rem;text-transform:uppercase;letter-spacing:.8px">${g.label}</span>
+      </div>`;
+    gc.forEach(c=>{
+      const n=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).length;
+      const att=D.attendance[`${c.id}_${wk}`];
+      const done=att&&Object.keys(att.records||{}).length>0;
+      const nP=att?Object.values(att.records||{}).filter(v=>v==='present').length:0;
+      const nA=att?Object.values(att.records||{}).filter(v=>v==='absent').length:0;
+      html+=`<div class="cls-card" onclick="openAttFromToday('${c.id}')">
+        <div style="flex:1">
+          <div class="cls-name">${c.name}</div>
+          <div class="cls-meta">👤 ${c.coach} · ${n} player${n!==1?'s':''}</div>
+          ${done?`<div style="margin-top:5px;font-size:.73rem;font-family:var(--mono);color:var(--muted)">
+            <span style="color:var(--present);font-weight:700">${nP}✓</span>
+            <span style="color:var(--absent);font-weight:700;margin-left:6px">${nA}✗</span>
+            <span style="color:var(--muted);margin-left:6px">${n-nP-nA} unmarked</span></div>`:''}
+        </div>
+        ${done
+          ?'<span style="background:#161820;color:#4ade80;border:1px solid #1a5c3a;border-radius:20px;padding:3px 10px;font-size:.7rem;font-weight:800;flex-shrink:0">Done ✓</span>'
+          :'<span style="background:#221616;color:#f87171;border:1px solid #6b1f1f;border-radius:20px;padding:3px 10px;font-size:.7rem;font-weight:800;flex-shrink:0">Pending</span>'
+        }
+      </div>`;
+    });
+    html+='</div>';
+  });
+  lst.innerHTML=html;
+}
+function openAttFromToday(cid){showScreen('classes');openAtt(cid);}
+
+/* ── GROUPS / CLASSES ── */
+let selCls=null,selWk=null;
+function renderGroups(){
+  const con=document.getElementById('grpCon');
+  const q=(document.getElementById('classSearch')?.value||'').toLowerCase();
+  const all=D.classes.filter(c=>!q||c.name.toLowerCase().includes(q)||c.coach.toLowerCase().includes(q));
+  if(!D.classes.length){
+    con.innerHTML='<div class="empty"><div class="ico">🎾</div><p>No squads yet.<br>Go to <strong>Admin</strong> to get started.</p></div>';
+    return;
+  }
+  let html='';
+  GROUPS.forEach(g=>{
+    const cls=all.filter(c=>c.group===g.id);
+    if(!cls.length)return;
+    html+=`<div class="grp-sec g-${g.css}">
+      <div class="grp-hdr" onclick="toggleGrp('gb-${g.id}',this)">
+        <div class="grp-dot"></div>
+        <div class="grp-name">${g.label}</div>
+        <div class="grp-cnt">${cls.length} squad${cls.length!==1?'s':''}</div>
+        <div class="grp-arr open">›</div>
+      </div>
+      <div class="grp-body open" id="gb-${g.id}">`;
+    cls.forEach(c=>{
+      const n=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).length;
+      html+=`<div class="cls-card" onclick="openAtt('${c.id}')">
+        <div><div class="cls-name">${c.name}</div>
+        <div class="cls-meta"><strong>${c.coach}</strong> · ${c.day} · ${n} player${n!==1?'s':''}</div></div>
+        <div class="cls-badge">${n}</div></div>`;
+    });
+    html+='</div></div>';
+  });
+  if(!html)html='<div class="empty"><div class="ico">🔍</div><p>No matches.</p></div>';
+  con.innerHTML=html;
+}
+function toggleGrp(id,hdr){
+  const b=document.getElementById(id),a=hdr.querySelector('.grp-arr');
+  a.classList.toggle('open',b.classList.toggle('open'));
+}
+
+/* ── ATTENDANCE ── */
+function openAtt(cid){
+  selCls=cid;selWk=toWK(new Date());
+  document.getElementById('v-list').style.display='none';
+  document.getElementById('v-att').style.display='block';
+  // Scroll to top so date banner is visible first
+  const mc=document.querySelector('.main-content');
+  if(mc)mc.scrollTop=0;
+  renderAttHdr();updateDateBanner();renderWstrip();renderAttBody();
+}
+function backToList(){
+  selCls=null;selWk=null;
+  document.getElementById('v-att').style.display='none';
+  document.getElementById('v-list').style.display='block';
+  renderGroups();
+}
+function renderAttHdr(){
+  // Just triggers a full banner render — both class info and date live in attHdr now
+  updateDateBanner();
+}
+function updateDateBanner(){
+  const c=D.classes.find(x=>x.id===selCls);
+  const g=GROUPS.find(gr=>gr.id===c.group);
+  const mon=wkDate(selWk);
+  const di=DAYNAMES.indexOf(c?.day||'Monday');
+  const cd=new Date(mon);
+  cd.setDate(mon.getDate()+(di===0?6:di-1));
+  const dayStr=cd.toLocaleDateString('en-GB',{weekday:'long'});
+  const fullStr=cd.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const accentMap={dev:'#fb923c',prepf:'#c084fc',u11:'#4ade80',o11:'#facc15'};
+  const bgMap={
+    dev:  {bg:'#29200a',border:'#4a3214',text:'#fff',sub:'#fb923c'},
+    prepf:{bg:'#25123c',border:'#482464',text:'#fff',sub:'#c084fc'},
+    u11:  {bg:'#112614',border:'#1e4020',text:'#fff',sub:'#4ade80'},
+    o11:  {bg:'#242208',border:'#403e12',text:'#fff',sub:'#facc15'},
+  };
+  const accent=accentMap[g.css]||'#3b82f6';
+  const col=bgMap[g.css]||{bg:'#1c1d22',border:'#2a2b33',text:'#fff',sub:'#6b6f7a'};
+  // Split squad name: tokens separated by | — time token gets large
+  const parts=c.name.split('|').map(p=>p.trim()).filter(Boolean);
+  const timeRe=/\d{1,2}[:h]\d{2}(am|pm)?/i;
+  const nameHtml=parts.map(p=>{
+    if(timeRe.test(p))return`<span style="font-size:2.34rem;font-weight:900;color:#fff;line-height:1">${p}</span>`;
+    return`<span style="font-size:1.17rem;font-weight:700;color:rgba(255,255,255,.85)">${p}</span>`;
+  }).join(`<span style="color:${col.sub};margin:0 3px;font-size:1.17rem">|</span>`);
+  // Calendar icon: black header band + white month text, white card body, black day number
+  const calMonth=MONTHS[cd.getMonth()].toUpperCase();
+  const calDay=cd.getDate();
+  const calIcon=`<svg width="76" height="76" viewBox="0 0 76 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="cs" x="-15%" y="-15%" width="130%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0005"/></filter></defs>
+    <rect x="1" y="1" width="74" height="74" rx="12" fill="#ffffff" filter="url(#cs)"/>
+    <rect x="1" y="1" width="74" height="26" rx="12" fill="#dc2626"/>
+    <rect x="1" y="14" width="74" height="13" fill="#dc2626"/>
+    <text x="38" y="14" text-anchor="middle" dominant-baseline="central" font-family="Outfit,sans-serif" font-size="17.5" font-weight="800" fill="#fff" letter-spacing="2">${calMonth}</text>
+    <text x="38" y="53" text-anchor="middle" dominant-baseline="middle" font-family="Outfit,sans-serif" font-size="34" font-weight="900" fill="#111111">${calDay}</text>
+  </svg>`;
+  document.getElementById('attHdr').innerHTML=`
+    <div style="background:${col.bg};border:1.5px solid ${col.border};border-radius:14px;margin-bottom:12px;overflow:hidden">
+      <div style="padding:8px 14px 8px;display:flex;align-items:center;justify-content:space-between;gap:14px">
+        <div style="display:flex;align-items:center;gap:14px;flex-shrink:0">
+          ${calIcon}
+          <div style="font-size:2.7rem;font-weight:900;color:#fff;line-height:1">${dayStr}</div>
+        </div>
+        <div style="text-align:right;min-width:0">
+          <div style="margin-bottom:5px">
+            <span style="display:inline-block;background:${accent};color:#000;font-size:.81rem;font-weight:900;letter-spacing:1px;text-transform:uppercase;padding:3px 14px;border-radius:20px">${g.label}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;gap:2px;line-height:1.3">${nameHtml}</div>
+          <div style="font-size:.75rem;color:rgba(255,255,255,.55);margin-top:4px">Coaches: <strong style="color:#fff;font-weight:700">${c.coach}</strong></div>
+        </div>
+      </div>
+    </div>`;
+}
+function renderWstrip(){
+  const strip=document.getElementById('wstrip');
+  strip.innerHTML='';
+  const today=toWK(new Date());
+  const swks=seasonWks(D.seasonYear);
+  // Show a window of ±10 weeks around the SELECTED week (not today),
+  // but always show the full season — never truncate September or July
+  const selIdx=swks.indexOf(selWk);
+  const baseIdx=selIdx>=0?selIdx:swks.findIndex(w=>w>=today)||0;
+  const winStart=Math.max(0,baseIdx-10);
+  const winEnd=Math.min(swks.length-1,baseIdx+10);
+  const shown=swks.slice(winStart,winEnd+1);
+  // Ensure selWk is in the list even if somehow missing
+  if(!shown.includes(selWk)&&selIdx>=0)shown.splice(selIdx-winStart,0,selWk);
+  shown.forEach(w=>{
+    const active=D.activeWeeks.includes(w);
+    const att=D.attendance[`${selCls}_${w}`];
+    const done=att&&Object.keys(att.records||{}).length>0;
+    const isPast=w<today;
+    const tab=document.createElement('button');
+    let cls='wtab';
+    if(!active)         cls+=' hols';
+    else if(done)       cls+=' done';
+    else if(isPast)     cls+=' overdue';
+    if(w===selWk)       cls+=' sel';
+    tab.className=cls;
+    tab.innerHTML=`<div>${wkLbl(w)}</div><div style="font-size:.58rem;opacity:.7">${w}</div>`;
+    tab.onclick=()=>{selWk=w;updateDateBanner();renderWstrip();renderAttBody();};
+    strip.appendChild(tab);
+  });
+  setTimeout(()=>{
+    const el=strip.querySelector('.sel');
+    if(el)el.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
+  },60);
+}
+function shiftWeek(dir){
+  const swks=seasonWks(D.seasonYear);
+  const idx=swks.indexOf(selWk);
+  if(idx===-1){
+    // selWk not in season — jump to today or season start/end
+    selWk=dir>0?swks[0]:swks[swks.length-1];
+  } else {
+    const next=swks[idx+dir];
+    if(!next)return; // already at season boundary
+    selWk=next;
+  }
+  updateDateBanner();renderWstrip();renderAttBody();
+}
+function goToday(){
+  selWk=toWK(new Date());
+  updateDateBanner();renderWstrip();renderAttBody();
+}
+function renderAttBody(){
+  const body=document.getElementById('attBody');
+  const kids=D.children.filter(c=>(c.classIds||[c.classId]).includes(selCls));
+  const isHol=!D.activeWeeks.includes(selWk);
+  const aKey=`${selCls}_${selWk}`;
+  if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
+  const att=D.attendance[aKey];
+  if(isHol){
+    body.innerHTML=`<div class="hol-banner">
+      <div style="font-size:2rem;margin-bottom:8px">🏖️</div>
+      <div style="font-weight:900;color:var(--holiday);font-size:1.05rem;margin-bottom:5px">Holiday Week</div>
+      <div style="font-size:.83rem;color:var(--holiday)">This week is a holiday. No attendance recorded.</div>
+      <button class="btn btn-hol btn-sm" style="margin-top:14px" onclick="activateWeek()">Mark as Active</button>
+    </div>`;
+    return;
+  }
+  if(!kids.length){
+    body.innerHTML='<div class="empty"><div class="ico">👦</div><p>No players in this squad.<br>Add them in <strong>Admin</strong>.</p></div>';
+    return;
+  }
+  const nP=Object.values(att.records).filter(v=>v==='present').length;
+  const nA=Object.values(att.records).filter(v=>v==='absent').length;
+  const nU=kids.length-nP-nA;
+  const pct=(nP+nA)>0?Math.round(nP/(nP+nA)*100):null;
+  // Progress bar: coloured fill on subtle track, label outside bar, count inside
+  const pBar=(val,max,color,label,align)=>{
+    const w=max>0?Math.max(Math.round((val/max)*100),0):0;
+    const countTxt=`${val} / ${max}`;
+    // Present bar: label on left, fills left→right. Absent bar: label on right, fills right→left.
+    if(align==='left') return`<div style="flex:1;display:flex;align-items:center;gap:6px">
+      <span style="font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:${color};flex-shrink:0">${label}</span>
+      <div style="flex:1;height:18px;border-radius:9px;background:rgba(0,0,0,.07);position:relative;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:${w}%;background:${color};border-radius:9px;transition:width .3s"></div>
+        <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.65rem;font-weight:900;color:${w>25?'#fff':color};font-family:var(--mono);white-space:nowrap;z-index:1">${countTxt}</span>
+      </div>
+    </div>`;
+    return`<div style="flex:1;display:flex;align-items:center;gap:6px">
+      <div style="flex:1;height:18px;border-radius:9px;background:rgba(0,0,0,.07);position:relative;overflow:hidden">
+        <div style="position:absolute;right:0;top:0;bottom:0;width:${w}%;background:${color};border-radius:9px;transition:width .3s"></div>
+        <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.65rem;font-weight:900;color:${w>25?'#fff':color};font-family:var(--mono);white-space:nowrap;z-index:1">${countTxt}</span>
+      </div>
+      <span style="font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:${color};flex-shrink:0">${label}</span>
+    </div>`;
+  };
+  body.innerHTML=`
+    <div class="card" style="padding:12px 16px">
+      <div class="sec-lbl" style="margin-bottom:7px;font-size:1.02rem">📝 COACH NOTES</div>
+      <textarea class="fi" id="noteTa" rows="2" placeholder="Injuries, incidents, follow-ups…" oninput="saveNote()" style="margin-bottom:4px;resize:none;line-height:1.5"></textarea>
+      <div style="font-size:.7rem;color:var(--muted)">Auto-saved · included in Excel export</div>
+    </div>
+    <div class="card tight">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        ${pBar(nP,kids.length,'#22c55e','PRESENT','left')}
+        <div style="flex-shrink:0;text-align:center;padding:0 4px">
+          <div style="font-size:1.167rem;font-weight:500;color:var(--text);white-space:nowrap;letter-spacing:.033em;text-transform:uppercase;padding:0 7px">SQUAD REGISTER</div>
+        </div>
+        ${pBar(nA,kids.length,'#f87171','ABSENT','right')}
+      </div>
+      <div class="s-list" id="sList"></div>
+    </div>`;
+  const list=document.getElementById('sList');
+  // Set notes textarea value safely via JS (handles quotes, HTML chars etc.)
+  document.getElementById('noteTa').value=att.notes||'';
+  // Present/absent — filled circle with line-art, sized to match smaller row
+  const svgPresent=(on)=>`<svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="18" fill="${on?'#22c55e':'#252630'}"/><path d="M11 18.5l4.5 4.5 9.5-10" stroke="${on?'#000':'#4a5568'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgAbsent=(on)=>`<svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="18" fill="${on?'#f87171':'#252630'}"/><path d="M12 12l12 12M24 12l-12 12" stroke="${on?'#000':'#4a5568'}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+  // Gender icons — using exact paths provided by user
+  const svgMale=`<svg width="26" height="26" viewBox="0 0 660 656" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,-1887.36,-1522.83)"><g transform="matrix(1,0,0,1,12.2427,784.785)">
+      <path d="M2154.62,1393.59C1995.63,1369.26 1874.14,1231.32 1875.13,1065.76C1876.2,883.815 2024.8,736.971 2206.75,738.049C2388.7,739.127 2535.54,887.721 2534.46,1069.67C2533.49,1234.39 2411.61,1370.34 2253.54,1393.81C2274.62,1364.29 2349.09,1200.51 2405.16,1095.08C2412.68,1034.12 2355.51,1024.54 2355.51,1024.54L2043.43,1023.53C2043.43,1023.53 1996.66,1028.86 1998.03,1093.39C2035.76,1178.24 2121.11,1337.51 2149.96,1387.85C2151.18,1389.97 2152.75,1391.88 2154.62,1393.59ZM2200.3,807.338C2254.19,807.338 2297.95,851.094 2297.95,904.988C2297.95,958.882 2254.19,1002.64 2200.3,1002.64C2146.4,1002.64 2102.65,958.882 2102.65,904.988C2102.65,851.094 2146.4,807.338 2200.3,807.338Z" style="fill:rgb(76,124,215);"/>
+    </g></g>
+  </svg>`;
+  const svgFemale=`<svg width="26" height="26" viewBox="0 0 660 600" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,-1011.12,-1522.83)"><g transform="matrix(1,0,0,1,14.0165,784.785)">
+      <path d="M1135.85,1334.02C1159.45,1350.98 989.876,1241.58 997.338,1065.76C1005.05,883.976 1147.01,736.971 1328.96,738.049C1510.91,739.127 1660.95,887.768 1656.67,1069.67C1652.11,1263.8 1479.59,1359.16 1516.19,1333.7C1457.08,1222.55 1372.92,1050.7 1357.02,1035.53C1346.58,1025.56 1298.21,1015.98 1282.59,1043.24C1253.73,1093.57 1173.59,1249.17 1135.85,1334.02ZM1322.51,807.338C1376.4,807.338 1420.16,851.094 1420.16,904.988C1420.16,958.882 1376.4,1002.64 1322.51,1002.64C1268.61,1002.64 1224.86,958.882 1224.86,904.988C1224.86,851.094 1268.61,807.338 1322.51,807.338Z" style="fill:rgb(229,81,141);"/>
+    </g></g>
+  </svg>`;
+  kids.sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>{
+    const st=att.records[s.id]||'';
+    const genderIcon=s.gender==='f'?svgFemale:svgMale;
+    const yrStr=`<span style="font-size:.81rem;color:#a8b0bc;font-family:var(--mono);margin-left:7px;font-weight:400;letter-spacing:.04em">( ${s.birthYear} )</span>`;
+    const idLine=s.playerID?`<div style="font-size:.65rem;color:var(--muted);font-family:var(--mono);margin-top:1px">(${s.playerID})</div>`:'';
+    const row=document.createElement('div');
+    row.className=`s-row ${st}`;
+    row.innerHTML=`
+      <div class="s-info">
+        <div class="s-gender">${genderIcon}</div>
+        <div><div><span class="s-name">${s.name}</span>${yrStr}</div>${idLine}</div>
+      </div>
+      <div class="att-btns">
+        <button class="att-b" onclick="mark('${s.id}','present')">${svgPresent(st==='present')}</button>
+        <button class="att-b" onclick="mark('${s.id}','absent')">${svgAbsent(st==='absent')}</button>
+      </div>`;
+    list.appendChild(row);
+  });
+}
+function mark(sid,status){
+  const aKey=`${selCls}_${selWk}`;
+  if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
+  const cur=D.attendance[aKey].records[sid];
+  if(cur===status)delete D.attendance[aKey].records[sid];
+  else D.attendance[aKey].records[sid]=status;
+  saveD();renderAttBody();
+}
+function markAll(s){
+  const aKey=`${selCls}_${selWk}`;
+  if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
+  D.children.filter(c=>(c.classIds||[c.classId]).includes(selCls)).forEach(c=>D.attendance[aKey].records[c.id]=s);
+  saveD();renderAttBody();
+}
+function clearMarks(){
+  const aKey=`${selCls}_${selWk}`;
+  if(D.attendance[aKey])D.attendance[aKey].records={};
+  saveD();renderAttBody();
+}
+function saveNote(){
+  const aKey=`${selCls}_${selWk}`;
+  if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
+  D.attendance[aKey].notes=document.getElementById('noteTa').value;
+  saveD();
+}
+function activateWeek(){
+  if(!D.activeWeeks.includes(selWk))D.activeWeeks.push(selWk);
+  saveD();renderWstrip();renderAttBody();
+}
+
+/* ── STATS ── */
+function initStats(){statsGrpChg();}
+function statsGrpChg(){
+  const grp=document.getElementById('st-grp').value;
+  const sel=document.getElementById('st-cls');
+  const cls=grp?D.classes.filter(c=>c.group===grp):D.classes;
+  sel.innerHTML='<option value="">— pick a squad —</option>';
+  GROUPS.forEach(g=>{
+    const gc=cls.filter(c=>c.group===g.id);if(!gc.length)return;
+    const og=document.createElement('optgroup');og.label=g.label;
+    gc.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;og.appendChild(o);});
+    sel.appendChild(og);
+  });
+  renderStats();
+}
+function renderStats(){
+  const cid=document.getElementById('st-cls').value;
+  const out=document.getElementById('statsOut');
+  if(!cid){out.innerHTML='';return;}
+  const cls=D.classes.find(c=>c.id===cid);
+  const kids=D.children.filter(c=>(c.classIds||[c.classId]).includes(cid)).sort((a,b)=>a.name.localeCompare(b.name));
+  const aws=[...D.activeWeeks].sort();
+  const g=GROUPS.find(g=>g.id===cls.group);
+  const rows=kids.map(s=>{
+    let p=0,a=0;
+    aws.forEach(w=>{const v=D.attendance[`${cid}_${w}`]?.records?.[s.id];if(v==='present')p++;else if(v==='absent')a++;});
+    return{...s,p,a,pct:(p+a)>0?Math.round(p/(p+a)*100):null};
+  });
+  const tP=rows.reduce((s,r)=>s+r.p,0),tA=rows.reduce((s,r)=>s+r.a,0);
+  const notes=aws.filter(w=>D.attendance[`${cid}_${w}`]?.notes).map(w=>({w,n:D.attendance[`${cid}_${w}`].notes})).reverse().slice(0,15);
+  let html=`<div class="card tight">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span class="gbadge ${g.css}">${g.label}</span>
+      <span style="font-weight:800">${cls.name}</span>
+    </div>
+    <div class="stat-row" style="margin-bottom:12px">
+      <div class="stat-box"><div class="stat-n" style="color:var(--g)">${kids.length}</div><div class="stat-l">Students</div></div>
+      <div class="stat-box"><div class="stat-n" style="color:var(--present)">${tP}</div><div class="stat-l">Present</div></div>
+      <div class="stat-box"><div class="stat-n" style="color:var(--absent)">${tA}</div><div class="stat-l">Absent</div></div>
+    </div>`;
+  if(!kids.length){html+='<p style="color:var(--muted);font-size:.84rem">No students yet.</p>';}
+  else{
+    html+=`<table class="stbl"><thead><tr><th>Name</th><th>Born</th><th>Present</th><th>Absent</th><th>Rate</th></tr></thead><tbody>`;
+    rows.forEach(s=>{
+      const col=s.pct===null?'var(--muted)':s.pct>=80?'var(--present)':s.pct>=60?'var(--holiday)':'var(--absent)';
+      html+=`<tr><td><strong>${s.name}</strong></td><td style="font-family:var(--mono);font-size:.75rem">${s.birthYear}</td>
+        <td style="color:var(--present);font-weight:700">${s.p}</td>
+        <td style="color:var(--absent);font-weight:700">${s.a}</td>
+        <td>${s.pct!==null?`<div class="bar-w"><div class="bar-bg"><div class="bar-fill" style="width:${s.pct}%;background:${col}"></div></div><span class="bar-pct" style="color:${col}">${s.pct}%</span></div>`:'—'}</td></tr>`;
+    });
+    html+='</tbody></table>';
+  }
+  html+='</div>';
+  if(notes.length){
+    html+=`<div class="card"><div class="sec-lbl">📝 Recent Notes</div>`;
+    notes.forEach(n=>{html+=`<div class="note-card"><div class="note-wk">${wkLbl(n.w)} · ${n.w}</div><div class="note-txt">${n.n.replace(/\n/g,'<br>')}</div></div>`;});
+    html+='</div>';
+  }
+  out.innerHTML=html;
+}
+
+/* ── CALENDAR ── */
+function renderCal(){
+  const y=parseInt(document.getElementById('sy').value)||2025;
+  D.seasonYear=y;
+  document.getElementById('seasonRangeLabel').textContent=`Season: September ${y} — July ${y+1}`;
+  const swks=seasonWks(y);
+  const grid=document.getElementById('wgrid');
+  grid.innerHTML='';
+  let lastM=null;
+  swks.forEach(wk=>{
+    const d=wkDate(wk);const mk=`${d.getFullYear()}-${d.getMonth()}`;
+    if(mk!==lastM){
+      lastM=mk;
+      const sep=document.createElement('div');
+      sep.style.cssText='grid-column:1/-1;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:6px 2px 2px';
+      sep.textContent=`${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      grid.appendChild(sep);
+    }
+    const on=D.activeWeeks.includes(wk);
+    const div=document.createElement('div');
+    div.className=`wtog ${on?'on':'off'}`;
+    div.innerHTML=`<div style="font-weight:700">${wkLbl(wk)}</div><div style="font-size:.62rem;opacity:.7">${wk}</div>`;
+    div.onclick=()=>{
+      if(D.activeWeeks.includes(wk))D.activeWeeks=D.activeWeeks.filter(x=>x!==wk);
+      else D.activeWeeks.push(wk);
+      saveD();renderCal();
+    };
+    grid.appendChild(div);
+  });
+  const cnt=swks.filter(w=>D.activeWeeks.includes(w)).length;
+  document.getElementById('activeCnt').textContent=`${cnt} / ${swks.length} active weeks`;
+  saveD();
+}
+function rebuildWeeks(){
+  const y=parseInt(document.getElementById('sy').value)||2025;
+  D.seasonYear=y;D.activeWeeks=seasonWks(y);saveD();renderCal();
+}
+function setAllW(on){
+  const y=parseInt(document.getElementById('sy').value)||2025;
+  const swks=seasonWks(y);
+  if(on)swks.forEach(w=>{if(!D.activeWeeks.includes(w))D.activeWeeks.push(w);});
+  else D.activeWeeks=D.activeWeeks.filter(w=>!swks.includes(w));
+  saveD();renderCal();
+}
+
+/* ── ADMIN: CLASSES ── */
+function renderAdCls(){
+  const el=document.getElementById('adClsList');
+  if(!D.classes.length){el.innerHTML='<p style="color:var(--muted);font-size:.84rem;padding:6px 0">No squads yet.</p>';return;}
+  const sorted=[...D.classes].sort((a,b)=>{
+    const gi=g=>GROUPS.findIndex(x=>x.id===g);
+    return gi(a.group)-gi(b.group)||a.name.localeCompare(b.name);
+  });
+  el.innerHTML=sorted.map(c=>{
+    const g=GROUPS.find(x=>x.id===c.group);
+    const n=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).length;
+    return`<div class="ai">
+      <div><div class="ai-name">${c.name} <span class="gbadge ${g.css}">${g.label}</span></div>
+      <div class="ai-sub">${c.day} · ${c.coach} · ${n} student${n!==1?'s':''}</div></div>
+      <div class="ai-acts">
+        <button class="btn btn-xs btn-outline" onclick="editCls('${c.id}')">Edit</button>
+        <button class="btn btn-xs btn-red"     onclick="delCls('${c.id}')">Del</button>
+      </div></div>`;
+  }).join('');
+}
+
+/* ── ADMIN: CHILDREN ── */
+function populateChFil(){
+  const sel=document.getElementById('adChClsFil');
+  sel.innerHTML='<option value="">All squads</option>';
+  D.classes.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+}
+function syncChFil(){
+  const grp=document.getElementById('adChGrpFil').value;
+  const sel=document.getElementById('adChClsFil');
+  const cls=grp?D.classes.filter(c=>c.group===grp):D.classes;
+  sel.innerHTML='<option value="">All squads</option>';
+  cls.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+  renderAdCh();
+}
+function renderAdCh(){
+  const cf=document.getElementById('adChClsFil').value;
+  const gf=document.getElementById('adChGrpFil').value;
+  const el=document.getElementById('adChList');
+  let kids=D.children;
+  if(cf)kids=kids.filter(c=>(c.classIds||[c.classId]).includes(cf));
+  else if(gf){const ids=D.classes.filter(c=>c.group===gf).map(c=>c.id);kids=kids.filter(c=>(c.classIds||[c.classId]).some(id=>ids.includes(id)));}
+  kids=[...kids].sort((a,b)=>a.name.localeCompare(b.name));
+  if(!kids.length){el.innerHTML='<p style="color:var(--muted);font-size:.84rem;padding:6px 0">No children match filter.</p>';return;}
+  el.innerHTML=kids.map(ch=>{
+    const cids=ch.classIds||[ch.classId];
+    const badges=cids.map(cid=>{const cls=D.classes.find(c=>c.id===cid);const g=cls?GROUPS.find(g=>g.id===cls.group):null;return cls&&g?`<span class="gbadge ${g.css}">${cls.name}</span>`:''}).join(' ');
+    const pidStr=ch.playerID?` · ID: ${ch.playerID}`:'';
+    return`<div class="ai">
+      <div><div class="ai-name">${ch.name} ${badges}</div>
+      <div class="ai-sub">b. ${ch.birthYear}${pidStr}</div></div>
+      <div class="ai-acts">
+        <button class="btn btn-xs btn-outline" onclick="editCh('${ch.id}')">Edit</button>
+        <button class="btn btn-xs btn-red"     onclick="delCh('${ch.id}')">Del</button>
+      </div></div>`;
+  }).join('');
+}
+
+/* ── CLASS MODAL ── */
+function openClsMod(){
+  document.getElementById('mClsTit').textContent='Add Squad';
+  ['mc_id','mc_name','mc_coach'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mc_grp').value='development';
+  document.getElementById('mc_day').value='Saturday';
+  openMod('mCls');
+}
+function editCls(id){
+  const c=D.classes.find(x=>x.id===id);
+  document.getElementById('mClsTit').textContent='Edit Squad';
+  document.getElementById('mc_id').value=c.id;document.getElementById('mc_name').value=c.name;
+  document.getElementById('mc_coach').value=c.coach;document.getElementById('mc_grp').value=c.group;
+  document.getElementById('mc_day').value=c.day;
+  openMod('mCls');
+}
+function saveCls(){
+  const name=document.getElementById('mc_name').value.trim();
+  const coach=document.getElementById('mc_coach').value.trim();
+  const group=document.getElementById('mc_grp').value;
+  const day=document.getElementById('mc_day').value;
+  const id=document.getElementById('mc_id').value;
+  if(!name||!coach){toast('Fill in name and coach');return;}
+  if(id){const i=D.classes.findIndex(c=>c.id===id);D.classes[i]={...D.classes[i],name,coach,group,day};}
+  else D.classes.push({id:uid(),group,name,coach,day});
+  saveD();closeMod('mCls');renderAdCls();toast('Squad saved ✓');
+}
+function delCls(id){
+  if(!confirm('Delete this squad and all its attendance data?'))return;
+  D.classes=D.classes.filter(c=>c.id!==id);
+  // Remove this class from each child's classIds; remove child only if they have no classes left
+  D.children=D.children.map(c=>{
+    c.classIds=(c.classIds||[c.classId]).filter(cid=>cid!==id);
+    return c;
+  }).filter(c=>c.classIds.length>0);
+  Object.keys(D.attendance).forEach(k=>{if(k.startsWith(id+'_'))delete D.attendance[k];});
+  saveD();renderAdCls();toast('Deleted');
+}
+
+/* ── CHILD MODAL ── */
+function openChMod(){
+  if(!D.classes.length){toast('Add a squad first');return;}
+  document.getElementById('mChTit').textContent='Add Child';
+  ['ch_id','ch_name','ch_yr','ch_pid'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ch_gm').checked=true;
+  // Reset to one empty class row
+  const list=document.getElementById('chClsList');
+  list.innerHTML='';
+  addChClsRow();
+  openMod('mCh');
+}
+function addChClsRow(selectedId){
+  const list=document.getElementById('chClsList');
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:6px;align-items:center';
+  const sel=document.createElement('select');
+  sel.className='fs';sel.style.flex='1';
+  GROUPS.forEach(g=>{
+    const gc=D.classes.filter(c=>c.group===g.id).sort((a,b)=>a.name.localeCompare(b.name));
+    if(!gc.length)return;
+    const og=document.createElement('optgroup');og.label=g.label;
+    gc.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;if(c.id===selectedId)o.selected=true;og.appendChild(o);});
+    sel.appendChild(og);
+  });
+  const rm=document.createElement('button');
+  rm.type='button';rm.textContent='✕';
+  rm.style.cssText='flex-shrink:0;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;color:var(--muted);font-size:.85rem';
+  rm.onclick=()=>{if(list.children.length>1)list.removeChild(row);else toast('At least one squad required');};
+  row.appendChild(sel);row.appendChild(rm);
+  list.appendChild(row);
+}
+function editCh(id){
+  const ch=D.children.find(c=>c.id===id);
+  document.getElementById('mChTit').textContent='Edit Child';
+  document.getElementById('ch_id').value=ch.id;
+  document.getElementById('ch_name').value=ch.name;
+  document.getElementById('ch_yr').value=ch.birthYear;
+  document.getElementById('ch_pid').value=ch.playerID||'';
+  document.getElementById(ch.gender==='f'?'ch_gf':'ch_gm').checked=true;
+  const list=document.getElementById('chClsList');
+  list.innerHTML='';
+  const ids=ch.classIds||[];
+  if(ids.length){ids.forEach(cid=>addChClsRow(cid));}
+  else{addChClsRow();}
+  openMod('mCh');
+}
+function saveCh(){
+  const name=document.getElementById('ch_name').value.trim();
+  const yr=parseInt(document.getElementById('ch_yr').value);
+  const pid=document.getElementById('ch_pid').value.trim();
+  const id=document.getElementById('ch_id').value;
+  const gender=document.querySelector('input[name="ch_gender"]:checked')?.value||'m';
+  const sels=[...document.getElementById('chClsList').querySelectorAll('select')];
+  const classIds=[...new Set(sels.map(s=>s.value).filter(Boolean))];
+  if(!name||!yr||!classIds.length){toast('Fill all required fields');return;}  if(pid&&!/^\d{7}$/.test(pid)){toast('Player ID must be 7 digits');return;}
+  const obj={name,birthYear:yr,classIds,gender,playerID:pid||''};
+  if(id){const i=D.children.findIndex(c=>c.id===id);D.children[i]={...D.children[i],...obj};}
+  else D.children.push({id:uid(),...obj});
+  saveD();closeMod('mCh');renderAdCh();toast('Child saved ✓');
+}
+function delCh(id){
+  if(!confirm('Remove this child?'))return;
+  D.children=D.children.filter(c=>c.id!==id);
+  saveD();renderAdCh();
+}
+
+/* ── AUTO BACKUP ── */
+// Settings stored separately so they survive a data wipe
+const AB_KEY='ta_autobackup';
+function abSettings(){
+  try{return JSON.parse(localStorage.getItem(AB_KEY))||{};}catch{return{};}
+}
+function saveAbSettings(obj){
+  try{localStorage.setItem(AB_KEY,JSON.stringify(obj));}catch(e){}
+}
+
+function saveAutoBackupDay(){
+  const day=parseInt(document.getElementById('autoBackupDay').value);
+  const s=abSettings();s.day=day;saveAbSettings(s);
+  renderAutoBackupCard();
+  toast('Backup day saved ✓');
+}
+
+function runAutoBackup(manual=false){
+  const today=new Date().toISOString().split('T')[0];
+  const filename=`squads-backup-${today}.json`;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Record that backup ran today
+  const s=abSettings();s.lastRun=today;saveAbSettings(s);
+  if(manual){
+    toast('Backup saved to Downloads ✓');
+    renderAutoBackupCard();
+  } else {
+    // Subtle toast for auto-run — doesn't interrupt coaching
+    setTimeout(()=>toast('📦 Weekly backup saved to Downloads ✓'),1200);
+  }
+}
+
+function checkAutoBackup(){
+  const s=abSettings();
+  const backupDay=s.day!==undefined?s.day:1; // Default Monday
+  const lastRun=s.lastRun||'';
+  const now=new Date();
+  const todayDay=now.getDay(); // 0=Sun,1=Mon…6=Sat
+  const todayStr=now.toISOString().split('T')[0];
+  // Run if: today matches backup day AND hasn't run today yet
+  if(todayDay===backupDay && lastRun!==todayStr){
+    // Small delay so app finishes loading first
+    setTimeout(()=>runAutoBackup(false),2000);
+  }
+}
+
+function renderAutoBackupCard(){
+  const s=abSettings();
+  const backupDay=s.day!==undefined?s.day:1;
+  const lastRun=s.lastRun||null;
+  const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  // Set the select to current saved day
+  const sel=document.getElementById('autoBackupDay');
+  if(sel)sel.value=String(backupDay);
+  // Update status text
+  const statusEl=document.getElementById('autoBackupStatus');
+  if(!statusEl)return;
+  const dayLabel=dayNames[backupDay];
+  if(lastRun){
+    const d=new Date(lastRun);
+    const formatted=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    statusEl.innerHTML=`Automatically saves a backup to your Downloads folder every <strong style="color:var(--text)">${dayLabel}</strong> when the app is used.<br><br>
+      <span style="color:var(--present)">✓ Last backup: ${formatted}</span>`;
+  } else {
+    statusEl.innerHTML=`Automatically saves a backup to your Downloads folder every <strong style="color:var(--text)">${dayLabel}</strong> when the app is used.<br><br>
+      <span style="color:var(--muted)">No backup has run yet on this device.</span>`;
+  }
+}
+
+/* ── BACKUP / RESTORE ── */
+function exportJSON(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));
+  a.download=`tennis-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();toast('Backup downloaded ✓');
+}
+function importJSON(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=e=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const p=JSON.parse(ev.target.result);
+        if(p.attendance)D.attendance={...p.attendance,...D.attendance};
+        D.classes=p.classes||D.classes;D.children=p.children||D.children;
+        D.activeWeeks=p.activeWeeks||D.activeWeeks;D.seasonYear=p.seasonYear||D.seasonYear;
+        saveD();renderAdCls();renderAdCh();renderGroups();toast('Imported ✓');
+      }catch{toast('Invalid file');}
+    };
+    r.readAsText(e.target.files[0]);
+  };
+  inp.click();
+}
+function nukeAll(){
+  if(!confirm('Delete ALL data permanently?'))return;
+  if(!confirm('Really? Cannot be undone.'))return;
+  localStorage.removeItem('ta_v10');location.reload();
+}
+
+/* ── EXCEL ── */
+function exportExcel(){
+  if(typeof XLSX==='undefined'){
+    toast('Loading Excel library… tap again in a moment');
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onerror=()=>toast('No internet — Excel needs WiFi once to load');
+    document.head.appendChild(s);
+    return;
+  }
+  if(!D.classes.length){toast('No classes to export');return;}
+  const wb=XLSX.utils.book_new();
+  const aws=seasonWks(D.seasonYear).filter(w=>D.activeWeeks.includes(w));
+  // Bug 2 fix: guard against empty active weeks
+  if(!aws.length){toast('No active weeks — check Holidays tab');return;}
+  // Bug 4 fix: track used sheet names to avoid duplicates
+  const usedSheetNames=new Set();
+  GROUPS.forEach(g=>{
+    D.classes.filter(c=>c.group===g.id).forEach(c=>{
+      const kids=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).sort((a,b)=>a.name.localeCompare(b.name));
+      const hRow=['Name','Birth Year','Coach',...aws.map(w=>wkLbl(w)+'\n'+w),'Sessions Present','Sessions Absent','Attendance %'];
+      const rows=[hRow];
+      kids.forEach(s=>{
+        const wc=aws.map(w=>{const v=D.attendance[`${c.id}_${w}`]?.records?.[s.id];return v==='present'?'P':v==='absent'?'A':'';});
+        const p=wc.filter(v=>v==='P').length,a=wc.filter(v=>v==='A').length;
+        rows.push([s.name,s.birthYear,c.coach,...wc,p,a,(p+a)>0?Math.round(p/(p+a)*100)+'%':'']);
+      });
+      // Bug 1 fix: properly escape [ and ] in regex; also strip ' which Excel disallows
+      let sn=(g.prefix+'_'+c.name).replace(/[\\/:*?\[\]']/g,'').slice(0,31).trim();
+      // Bug 4 fix: deduplicate sheet names
+      if(usedSheetNames.has(sn)){let i=2;while(usedSheetNames.has(sn.slice(0,28)+'_'+i))i++;sn=sn.slice(0,28)+'_'+i;}
+      usedSheetNames.add(sn);
+      const ws=XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols']=[{wch:24},{wch:11},{wch:20},...aws.map(()=>({wch:12})),{wch:18},{wch:16},{wch:14}];
+      XLSX.utils.book_append_sheet(wb,ws,sn);
+    });
+  });
+  const nRows=[['Group','Class','Coach','Week','Date','Notes']];
+  GROUPS.forEach(g=>D.classes.filter(c=>c.group===g.id).forEach(c=>{
+    aws.forEach(w=>{const n=D.attendance[`${c.id}_${w}`]?.notes;if(n)nRows.push([g.label,c.name,c.coach,w,wkLbl(w),n]);});
+  }));
+  const wsN=XLSX.utils.aoa_to_sheet(nRows);
+  wsN['!cols']=[{wch:18},{wch:26},{wch:18},{wch:12},{wch:12},{wch:90}];
+  XLSX.utils.book_append_sheet(wb,wsN,'All Coach Notes');
+  const sRows=[['Group','Class','Coach','Day','Students','Total Present','Total Absent','Avg %']];
+  GROUPS.forEach(g=>D.classes.filter(c=>c.group===g.id).forEach(c=>{
+    const kids=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id));let tp=0,ta=0;
+    kids.forEach(s=>aws.forEach(w=>{const v=D.attendance[`${c.id}_${w}`]?.records?.[s.id];if(v==='present')tp++;else if(v==='absent')ta++;}));
+    sRows.push([g.label,c.name,c.coach,c.day,kids.length,tp,ta,(tp+ta)>0?Math.round(tp/(tp+ta)*100)+'%':'']);
+  }));
+  const wsS=XLSX.utils.aoa_to_sheet(sRows);
+  wsS['!cols']=[{wch:18},{wch:26},{wch:18},{wch:12},{wch:10},{wch:14},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,wsS,'Summary');
+  XLSX.writeFile(wb,`tennis-attendance-${new Date().toISOString().split('T')[0]}.xlsx`);
+  toast('Excel downloaded ✓');
+}
+
+/* ── EXCEL IMPORT: SQUADS ── */
+function importSquadsXlsx(){
+  if(typeof XLSX==='undefined'){
+    toast('Loading Excel library… tap again in a moment');
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onerror=()=>toast('No internet — Excel library needs WiFi once');
+    document.head.appendChild(s);
+    return;
+  }
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls';
+  inp.onchange=e=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'array'});
+        const ws=wb.Sheets['Squads'];
+        if(!ws){toast('Sheet "Squads" not found in file');return;}
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){toast('No data rows found in Squads sheet');return;}
+        // Map group name strings to group IDs — broad matching for common variations
+        const groupMap={
+          'development':'development','dev':'development','develop':'development','developments':'development',
+          'pre-performance':'pre-performance','pre performance':'pre-performance','prepf':'pre-performance',
+          'pre':'pre-performance','preperformance':'pre-performance','pre-perf':'pre-performance',
+          'u11 performance':'u11-performance','u11-performance':'u11-performance','u11':'u11-performance',
+          'u11perf':'u11-performance','u11 perf':'u11-performance','under 11':'u11-performance','under11':'u11-performance',
+          'o11 performance':'o11-performance','over11 performance':'o11-performance','o11-performance':'o11-performance',
+          'o11':'o11-performance','over 11':'o11-performance','over11':'o11-performance',
+          'o11perf':'o11-performance','o11 perf':'o11-performance'
+        };
+        // Also do a prefix-based fallback for unrecognised values
+        function resolveGroup(raw){
+          if(groupMap[raw])return groupMap[raw];
+          if(raw.startsWith('dev'))return'development';
+          if(raw.startsWith('pre'))return'pre-performance';
+          if(raw.startsWith('u11')||raw.startsWith('under'))return'u11-performance';
+          if(raw.startsWith('o11')||raw.startsWith('over'))return'o11-performance';
+          return null;
+        }
+        let added=0,skipped=0;
+        rows.forEach(row=>{
+          const groupRaw=(row['Group']||'').toString().trim().toLowerCase();
+          const groupId=resolveGroup(groupRaw);
+          if(!groupId){skipped++;return;}
+          const name=(row['Squad name']||row['Squad Name']||row['squad name']||row['Name']||'').toString().trim();
+          const coach=(row['Coaches']||row['Coach']||'').toString().trim();
+          const day=(row['Weekday']||row['Day']||'').toString().trim();
+          if(!name){skipped++;return;}
+          // Check if squad already exists (match on group+name)
+          const exists=D.classes.some(c=>c.group===groupId&&c.name.toLowerCase()===name.toLowerCase());
+          if(exists){skipped++;return;}
+          D.classes.push({id:uid(),group:groupId,name,coach,day});
+          added++;
+        });
+        saveD();renderAdCls();renderGroups();renderToday();
+        toast(`Squads imported: ${added} added, ${skipped} skipped ✓`);
+      }catch(err){toast('Error reading file: '+err.message);}
+    };
+    r.readAsArrayBuffer(e.target.files[0]);
+  };
+  inp.click();
+}
+
+/* ── EXCEL IMPORT: PLAYERS ── */
+function importPlayersXlsx(){
+  if(typeof XLSX==='undefined'){
+    toast('Loading Excel library… tap again in a moment');
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onerror=()=>toast('No internet — Excel library needs WiFi once');
+    document.head.appendChild(s);
+    return;
+  }
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls';
+  inp.onchange=e=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'array'});
+        const ws=wb.Sheets['Players'];
+        if(!ws){toast('Sheet "Players" not found in file');return;}
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){toast('No data rows found in Players sheet');return;}
+        let added=0,skipped=0;
+        rows.forEach(row=>{
+          const firstName=(row['First Name']||row['First name']||row['firstname']||'').toString().trim();
+          const lastName=(row['Last name']||row['Last Name']||row['lastname']||'').toString().trim();
+          const fullName=[firstName,lastName].filter(Boolean).join(' ');
+          if(!fullName){skipped++;return;}
+          const pid=(row['ID']||'').toString().trim();
+          const birthYear=parseInt(row['Birth Year']||row['Birth year']||row['birthyear']||0);
+          const genderRaw=(row['Gender']||'').toString().trim().toLowerCase();
+          const gender=genderRaw==='f'||genderRaw==='female'||genderRaw==='girl'?'f':'m';
+          // Resolve squad names to IDs — look at Squad1..Squad5 columns
+          const squadCols=['Squad1','Squad2','Squad3','Squad4','Squad5'];
+          const classIds=[];
+          squadCols.forEach(col=>{
+            const sn=(row[col]||'').toString().trim();
+            if(!sn)return;
+            const cls=D.classes.find(c=>c.name.toLowerCase()===sn.toLowerCase()||
+              c.name.toLowerCase().includes(sn.toLowerCase()));
+            if(cls&&!classIds.includes(cls.id))classIds.push(cls.id);
+          });
+          if(!classIds.length){skipped++;return;}
+          // Check duplicates: match by playerID (if set) or by full name
+          const dupById=pid&&D.children.some(c=>c.playerID&&c.playerID===pid);
+          const dupByName=D.children.some(c=>c.name.toLowerCase()===fullName.toLowerCase());
+          if(dupById||dupByName){skipped++;return;}
+          const child={id:uid(),name:fullName,birthYear:birthYear||0,classIds,gender,playerID:pid};
+          D.children.push(child);
+          added++;
+        });
+        saveD();renderAdCh();
+        toast(`Players imported: ${added} added, ${skipped} skipped ✓`);
+      }catch(err){toast('Error reading file: '+err.message);}
+    };
+    r.readAsArrayBuffer(e.target.files[0]);
+  };
+  inp.click();
+}
+
+/* ── MODALS ── */
+function openMod(id){document.getElementById(id).classList.add('on');}
+function closeMod(id){document.getElementById(id).classList.remove('on');}
+document.querySelectorAll('.modal-bg').forEach(b=>b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('on');}));
+
+/* ── TOAST ── */
+let tt;
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');
+  clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2800);
+}
+
+/* ── INIT ── */
+loadD();
+document.getElementById('hdrDate').textContent=
+  new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+// silently pre-load SheetJS
+const _x=document.createElement('script');
+_x.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+document.head.appendChild(_x);
+renderToday();
+// Check if weekly auto-backup should run today
+checkAutoBackup();
+
+</script>
+</body>
+</html>
