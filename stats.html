@@ -260,6 +260,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     <span class="cnb-lbl">Leavers</span>
   </button>
+  <div class="cnb-divider"></div>
+  <button class="cnb" id="cnb-archived" onclick="showTab('archived')">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+    <span class="cnb-lbl">Archived</span>
+  </button>
   <!-- UoW Wordmark -->
   <div style="display:flex;justify-content:center;align-items:center;margin-top:auto;margin-bottom:auto;flex-shrink:0;width:100%">
     <svg viewBox="0 0 191 716" preserveAspectRatio="xMidYMid meet" width="34" height="126" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
@@ -403,6 +408,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="leaver-list" id="leaverPartList"></div>
   </div>
 
+  <!-- ARCHIVED SQUADS -->
+  <div class="tab-page" id="tab-archived">
+    <div class="sec-title" style="display:flex;align-items:center;gap:10px">
+      📦 Archived Squads
+      <span id="archivedSquadCount" style="font-size:.65rem;font-weight:400;color:var(--muted)"></span>
+    </div>
+    <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px;line-height:1.6;max-width:640px">
+      Squads that have been retired. Attendance data is fully preserved — all sessions and player records shown below.
+    </p>
+    <div class="filter-tabs" id="archivedFilter"></div>
+    <div id="archivedOut"></div>
+  </div>
+
 </div>
 </div>
 </div>
@@ -434,13 +452,14 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 function showTab(id){
   activeTab=id;
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.cnb').forEach(b=>b.classList.remove('on'));
   document.getElementById('tab-'+id).classList.add('on');
-  document.querySelector(`[data-tab="${id}"]`).classList.add('on');
+  const nb=document.getElementById('cnb-'+id);if(nb)nb.classList.add('on');
   if(id==='squads'&&!document.getElementById('squadList').innerHTML){renderSquadFilter();renderSquadList();}
   if(id==='players'&&!document.getElementById('heatmapOut').innerHTML){renderHeatmapFilter();renderHeatmap();}
   if(id==='leavers')renderLeaversTab();
   if(id==='overview')renderTrend();
+  if(id==='archived')renderArchivedTab();
 }
 
 /* ── FILE LOAD ── */
@@ -475,28 +494,41 @@ function showDashboard(){
   document.getElementById('sbSeason').textContent=`Sep ${SD.seasonYear} – Jul ${SD.seasonYear+1}`;
   document.getElementById('sbWeeks').textContent=`${SD.weeks.length} active weeks (S-W01 – S-W${String(SD.weeks.length).padStart(2,'0')})`;
   document.getElementById('sbExported').textContent=SD.exportedAt?new Date(SD.exportedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-  document.getElementById('topbarMeta').innerHTML=`Season ${SD.seasonYear}/${String(SD.seasonYear+1).slice(2)}<br>${SD.weeks.length} wks · ${SD.squads.length} squads`;
+  const activeSquads=(SD.squads||[]).filter(s=>!s.archived);
+  const archivedSquads=(SD.squads||[]).filter(s=>s.archived);
+  document.getElementById('topbarMeta').innerHTML=`Season ${SD.seasonYear}/${String(SD.seasonYear+1).slice(2)}<br>${SD.weeks.length} wks · ${activeSquads.length} squad${activeSquads.length!==1?'s':''}${archivedSquads.length?' · '+archivedSquads.length+' archived':''}`;
   const lc=(SD.leavers||[]).filter(l=>l.leftProgramme).length;
-  if(lc)document.getElementById('leaversTabBtn').textContent=`📦 Leavers (${lc})`;
+  if(lc)document.getElementById('cnb-leavers').querySelector('.cnb-lbl').textContent=`Leavers (${lc})`;
+  // Show archived button only if there are archived squads, dim it otherwise
+  const archivedBtn=document.getElementById('cnb-archived');
+  if(archivedSquads.length){
+    archivedBtn.style.opacity='1';archivedBtn.style.pointerEvents='auto';
+    archivedBtn.querySelector('.cnb-lbl').textContent=`Archived (${archivedSquads.length})`;
+  } else {
+    archivedBtn.style.opacity='.3';archivedBtn.style.pointerEvents='none';
+  }
   renderKPIs();renderGroupCards();renderTrendFilter();renderTrend();
 }
 
 /* ── KPIs ── */
 function renderKPIs(){
-  const allP=SD.squads.reduce((s,sq)=>s+sq.totalPresent,0);
-  const allA=SD.squads.reduce((s,sq)=>s+sq.totalAbsent,0);
-  const allPlayers=new Set(SD.squads.flatMap(sq=>sq.players.map(p=>p.id))).size;
+  const activeSqs=SD.squads.filter(sq=>!sq.archived);
+  const allP=activeSqs.reduce((s,sq)=>s+sq.totalPresent,0);
+  const allA=activeSqs.reduce((s,sq)=>s+sq.totalAbsent,0);
+  const allPlayers=new Set(activeSqs.flatMap(sq=>sq.players.map(p=>p.id))).size;
   const pct=(allP+allA)>0?Math.round(allP/(allP+allA)*100):0;
-  const ranked=[...SD.squads].filter(sq=>sq.totalPresent+sq.totalAbsent>0)
+  const ranked=[...activeSqs].filter(sq=>sq.totalPresent+sq.totalAbsent>0)
     .sort((a,b)=>(b.totalPresent/(b.totalPresent+b.totalAbsent))-(a.totalPresent/(a.totalPresent+a.totalAbsent)));
   const best=ranked[0];const worst=ranked[ranked.length-1];
   const lc=(SD.leavers||[]).filter(l=>l.leftProgramme).length;
+  const archivedCount=SD.squads.filter(sq=>sq.archived).length;
   document.getElementById('kpiRow').innerHTML=`
     <div class="kpi"><div class="kpi-n" style="color:var(--present)">${pct}%</div><div class="kpi-l">Season Average</div><div class="kpi-sub">${allP}P · ${allA}A</div></div>
-    <div class="kpi"><div class="kpi-n">${allPlayers}</div><div class="kpi-l">Active Players</div><div class="kpi-sub">across ${SD.squads.length} squads</div></div>
+    <div class="kpi"><div class="kpi-n">${allPlayers}</div><div class="kpi-l">Active Players</div><div class="kpi-sub">across ${activeSqs.length} squad${activeSqs.length!==1?'s':''}</div></div>
     <div class="kpi"><div class="kpi-n">${SD.weeks.length}</div><div class="kpi-l">Coaching Weeks</div><div class="kpi-sub">S-W01 – S-W${String(SD.weeks.length).padStart(2,'0')}</div></div>
     <div class="kpi"><div class="kpi-n">${allP+allA}</div><div class="kpi-l">Total Records</div><div class="kpi-sub">${allP} present · ${allA} absent</div></div>
     ${lc?`<div class="kpi"><div class="kpi-n" style="color:#f87171">${lc}</div><div class="kpi-l">Left Programme</div><div class="kpi-sub">this season</div></div>`:''}
+    ${archivedCount?`<div class="kpi"><div class="kpi-n" style="color:var(--muted)">${archivedCount}</div><div class="kpi-l">Archived Squads</div><div class="kpi-sub">data preserved</div></div>`:''}
     ${best?`<div class="kpi"><div class="kpi-n" style="color:var(--present);font-size:1.3rem">${Math.round(best.totalPresent/(best.totalPresent+best.totalAbsent)*100)}%</div><div class="kpi-l">Best Squad</div><div class="kpi-sub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${best.name}</div></div>`:''}
     ${worst&&worst!==best?`<div class="kpi"><div class="kpi-n" style="color:var(--absent);font-size:1.3rem">${Math.round(worst.totalPresent/(worst.totalPresent+worst.totalAbsent)*100)}%</div><div class="kpi-l">Needs Attention</div><div class="kpi-sub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${worst.name}</div></div>`:''}
   `;
@@ -507,7 +539,7 @@ function renderGroupCards(){
   const bgM={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
   const brM={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
   const stats=GROUPS.map(g=>{
-    const sqs=SD.squads.filter(sq=>sq.groupId===g.id);
+    const sqs=SD.squads.filter(sq=>!sq.archived&&sq.groupId===g.id);
     const p=sqs.reduce((s,sq)=>s+sq.totalPresent,0);
     const a=sqs.reduce((s,sq)=>s+sq.totalAbsent,0);
     const pct=(p+a)>0?Math.round(p/(p+a)*100):null;
@@ -526,7 +558,7 @@ function renderGroupCards(){
 
 /* ── TREND ── */
 function renderTrendFilter(){
-  const gps=GROUPS.filter(g=>SD.squads.some(sq=>sq.groupId===g.id));
+  const gps=GROUPS.filter(g=>SD.squads.some(sq=>!sq.archived&&sq.groupId===g.id));
   document.getElementById('trendFilter').innerHTML=
     `<button class="ftab all ${trendGroupSel==='all'?'on':''}" onclick="setTG('all')">All Groups</button>`
     +gps.map(g=>`<button class="ftab ${g.css} ${trendGroupSel===g.id?'on':''}" onclick="setTG('${g.id}')">${g.label}</button>`).join('');
@@ -538,7 +570,7 @@ function renderTrend(){
   const W=canvas.parentElement.offsetWidth||800,H=220;
   canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');ctx.clearRect(0,0,W,H);
-  const sqs=trendGroupSel==='all'?SD.squads:SD.squads.filter(s=>s.groupId===trendGroupSel);
+  const sqs=(trendGroupSel==='all'?SD.squads:SD.squads.filter(s=>s.groupId===trendGroupSel)).filter(s=>!s.archived);
   const pts=SD.weeks.map((wk,wi)=>{
     let p=0,a=0;
     sqs.forEach(sq=>sq.players.forEach(pl=>{const v=pl.weekData[wk];if(v==='P')p++;else if(v==='A')a++;}));
@@ -599,14 +631,14 @@ function drawLine(ctx,W,H,pts,color,grad){
 
 /* ── SQUADS ── */
 function renderSquadFilter(){
-  const gps=GROUPS.filter(g=>SD.squads.some(sq=>sq.groupId===g.id));
+  const gps=GROUPS.filter(g=>SD.squads.some(sq=>!sq.archived&&sq.groupId===g.id));
   document.getElementById('squadFilter').innerHTML=
     `<button class="ftab all ${squadGroupSel==='all'?'on':''}" onclick="setSG('all')">All Groups</button>`
     +gps.map(g=>`<button class="ftab ${g.css} ${squadGroupSel===g.id?'on':''}" onclick="setSG('${g.id}')">${g.label}</button>`).join('');
 }
 function setSG(id){squadGroupSel=id;renderSquadFilter();renderSquadList();}
 function renderSquadList(){
-  const sqs=(squadGroupSel==='all'?SD.squads:SD.squads.filter(s=>s.groupId===squadGroupSel))
+  const sqs=(squadGroupSel==='all'?SD.squads.filter(s=>!s.archived):SD.squads.filter(s=>!s.archived&&s.groupId===squadGroupSel))
     .map(sq=>{const p=sq.totalPresent,a=sq.totalAbsent;return{...sq,pct:(p+a)>0?Math.round(p/(p+a)*100):null};})
     .sort((a,b)=>(b.pct||0)-(a.pct||0));
   document.getElementById('squadList').innerHTML=sqs.map(sq=>{
@@ -625,14 +657,14 @@ function renderSquadList(){
 
 /* ── HEATMAP ── */
 function renderHeatmapFilter(){
-  const gps=GROUPS.filter(g=>SD.squads.some(sq=>sq.groupId===g.id));
+  const gps=GROUPS.filter(g=>SD.squads.some(sq=>!sq.archived&&sq.groupId===g.id));
   document.getElementById('heatmapFilter').innerHTML=
     `<button class="ftab all ${heatmapGroupSel==='all'?'on':''}" onclick="setHG('all')">All Groups</button>`
     +gps.map(g=>`<button class="ftab ${g.css} ${heatmapGroupSel===g.id?'on':''}" onclick="setHG('${g.id}')">${g.label}</button>`).join('');
 }
 function setHG(id){heatmapGroupSel=id;renderHeatmapFilter();renderHeatmap();}
 function renderHeatmap(){
-  const sqs=heatmapGroupSel==='all'?SD.squads:SD.squads.filter(s=>s.groupId===heatmapGroupSel);
+  const sqs=(heatmapGroupSel==='all'?SD.squads:SD.squads.filter(s=>s.groupId===heatmapGroupSel)).filter(s=>!s.archived);
   const out=document.getElementById('heatmapOut');
   if(!sqs.length){out.innerHTML='<p style="color:var(--muted);font-size:.84rem">No squads in this group.</p>';return;}
   const wks=SD.weeks;
@@ -793,6 +825,103 @@ function _renderProgList(prog){
 function _wl(wk){
   try{const[y,w]=wk.split('-W');const s=new Date(+y,0,1+(+w-1)*7);const d=s.getDay();if(d<=4)s.setDate(s.getDate()-d+1);else s.setDate(s.getDate()+8-d);return`${s.getDate()} ${MONTHS[s.getMonth()]}`;}catch{return wk;}
 }
+
+/* ══ ARCHIVED SQUADS TAB ══ */
+let archivedGroupSel='all';
+function renderArchivedTab(){
+  const archived=SD.squads.filter(s=>s.archived);
+  const el=document.getElementById('archivedOut');
+  const countEl=document.getElementById('archivedSquadCount');
+
+  if(!archived.length){
+    countEl.textContent='';
+    el.innerHTML='<p style="color:var(--muted);font-size:.84rem;padding:8px 0">No archived squads in this export.</p>';
+    document.getElementById('archivedFilter').innerHTML='';
+    return;
+  }
+
+  countEl.textContent=`(${archived.length} squad${archived.length!==1?'s':''})`;
+
+  // Group filter — only groups that have archived squads
+  const gps=GROUPS.filter(g=>archived.some(sq=>sq.groupId===g.id));
+  document.getElementById('archivedFilter').innerHTML=
+    `<button class="ftab all ${archivedGroupSel==='all'?'on':''}" onclick="setAG('all')">All Groups</button>`
+    +gps.map(g=>`<button class="ftab ${g.css} ${archivedGroupSel===g.id?'on':''}" onclick="setAG('${g.id}')">${g.label}</button>`).join('');
+
+  const sqs=(archivedGroupSel==='all'?archived:archived.filter(s=>s.groupId===archivedGroupSel))
+    .sort((a,b)=>{
+      const gi=g=>GROUPS.findIndex(x=>x.id===g);
+      return gi(a.groupId)-gi(b.groupId)||a.name.localeCompare(b.name);
+    });
+
+  const wks=SD.weeks;
+
+  el.innerHTML=sqs.map(sq=>{
+    const grp=GRP_MAP[sq.groupId]||{color:'#6b6f7a',label:sq.groupId,css:'dev'};
+    const players=[...sq.players].sort((a,b)=>a.name.localeCompare(b.name));
+    const archivedLabel=sq.archivedAt?`Archived ${_wl(sq.archivedAt)} (${sq.archivedAt})`:'Archived';
+    const totalP=sq.totalPresent,totalA=sq.totalAbsent;
+    const squadPct=(totalP+totalA)>0?Math.round(totalP/(totalP+totalA)*100):null;
+    const pctCol=squadPct==null?'var(--muted)':squadPct>=80?'#22c55e':squadPct>=60?'#fbbf24':'#f87171';
+
+    // Summary row
+    const summaryRow=`
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:rgba(164,153,244,0.05);border-radius:8px;border:1px solid rgba(164,153,244,0.12)">
+        <div><span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Sessions</span><div style="font-size:1.1rem;font-weight:800;color:var(--text)">${wks.length}</div></div>
+        <div><span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Players</span><div style="font-size:1.1rem;font-weight:800;color:var(--text)">${players.length}</div></div>
+        <div><span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Present</span><div style="font-size:1.1rem;font-weight:800;color:#22c55e">${totalP}</div></div>
+        <div><span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Absent</span><div style="font-size:1.1rem;font-weight:800;color:#f87171">${totalA}</div></div>
+        <div><span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Avg Att</span><div style="font-size:1.1rem;font-weight:800;color:${pctCol}">${squadPct!=null?squadPct+'%':'—'}</div></div>
+      </div>`;
+
+    if(!players.length){
+      return`<div class="heatmap-squad" style="opacity:.8;border-left:3px solid var(--muted)">
+        <div class="heatmap-squad-title">
+          <span style="width:8px;height:8px;border-radius:50%;background:${grp.color};display:inline-block;flex-shrink:0"></span>
+          <span style="color:${grp.color}">${sq.name}</span>
+          <span style="font-size:.6rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px;margin-left:4px">archived</span>
+          <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${sq.coach} · ${archivedLabel}</span>
+        </div>
+        <p style="color:var(--muted);font-size:.84rem;padding:6px 0">No player attendance records in this export.</p>
+      </div>`;
+    }
+
+    const hdr=wks.map((_,i)=>`<th>S-W${String(i+1).padStart(2,'0')}</th>`).join('');
+    const rows=players.map(pl=>{
+      const p=Object.values(pl.weekData||{}).filter(v=>v==='P').length;
+      const a=Object.values(pl.weekData||{}).filter(v=>v==='A').length;
+      const pct=(p+a)>0?Math.round(p/(p+a)*100):null;
+      const pc=pct==null?'':pct>=80?'cell-pct-hi':pct>=60?'cell-pct-mid':'cell-pct-lo';
+      const cells=wks.map(wk=>{
+        const v=pl.weekData?pl.weekData[wk]:null;
+        const cls=v==='P'?'cell-p':v==='A'?'cell-a':v==='H'?'cell-h':'cell-u';
+        return`<td class="${cls}">${v==='P'?'P':v==='A'?'A':v==='H'?'·':''}</td>`;
+      }).join('');
+      return`<tr>
+        <td class="player-name">${pl.name}${pl.playerID?`<span class="pid">${pl.playerID}</span>`:''}</td>
+        ${cells}
+        <td class="stat-col" style="color:#22c55e">${p}</td>
+        <td class="stat-col" style="color:#f87171">${a}</td>
+        <td class="stat-col ${pc}">${pct!=null?pct+'%':'—'}</td>
+      </tr>`;
+    }).join('');
+
+    return`<div class="heatmap-squad" style="opacity:.85;border-left:3px solid rgba(107,111,122,0.4)">
+      <div class="heatmap-squad-title">
+        <span style="width:8px;height:8px;border-radius:50%;background:${grp.color};display:inline-block;flex-shrink:0"></span>
+        <span style="color:${grp.color}">${sq.name}</span>
+        <span style="font-size:.6rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px;margin-left:4px">archived</span>
+        <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${sq.coach} · ${archivedLabel}</span>
+      </div>
+      ${summaryRow}
+      <div class="heatmap-wrap"><table class="heatmap-table">
+        <thead><tr><th class="player-col">Player</th>${hdr}<th style="color:#22c55e">P</th><th style="color:#f87171">A</th><th>%</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  }).join('');
+}
+function setAG(id){archivedGroupSel=id;renderArchivedTab();}
 
 /* ── TOAST ── */
 let _tt;

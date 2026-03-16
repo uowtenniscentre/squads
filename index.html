@@ -854,6 +854,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
 
 <div class="toast" id="toast"></div>
 
+<!-- SQUAD PLAYERS MODAL -->
+<div class="modal-bg" id="mSqpList">
+  <div class="modal">
+    <div class="modal-grab"></div>
+    <div class="modal-title" id="sqpTitle">Squad Players</div>
+    <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px;line-height:1.6">Remove all players from this squad before archiving it. Use <strong style="color:var(--text)">Leave Squad</strong> to process each player through the standard leaving flow.</p>
+    <div id="sqpList"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeMod('mSqpList')">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -1065,7 +1078,7 @@ function renderToday(){
     </div>`;
     return;
   }
-  const tc=D.classes.filter(c=>c.day===dn);
+  const tc=D.classes.filter(c=>!c.archived&&c.day===dn);
   if(!tc.length){
     lbl.textContent='';
     lst.innerHTML=`<div class="today-none" style="padding:40px 20px">
@@ -1115,8 +1128,9 @@ let selCls=null,selWk=null;
 function renderGroups(){
   const con=document.getElementById('grpCon');
   const q=(document.getElementById('classSearch')?.value||'').toLowerCase();
-  const all=D.classes.filter(c=>!q||c.name.toLowerCase().includes(q)||c.coach.toLowerCase().includes(q));
-  if(!D.classes.length){
+  const all=D.classes.filter(c=>!c.archived&&(!q||c.name.toLowerCase().includes(q)||c.coach.toLowerCase().includes(q)));
+  const activeClasses=D.classes.filter(c=>!c.archived);
+  if(!activeClasses.length){
     con.innerHTML='<div class="empty"><div class="ico">🎾</div><p>No squads yet.<br>Go to <strong>Admin</strong> to get started.</p></div>';
     return;
   }
@@ -1411,7 +1425,7 @@ function initStats(){statsGrpChg();}
 function statsGrpChg(){
   const grp=document.getElementById('st-grp').value;
   const sel=document.getElementById('st-cls');
-  const cls=grp?D.classes.filter(c=>c.group===grp):D.classes;
+  const cls=grp?D.classes.filter(c=>!c.archived&&c.group===grp):D.classes.filter(c=>!c.archived);
   sel.innerHTML='<option value="">— pick a squad —</option>';
   GROUPS.forEach(g=>{
     const gc=cls.filter(c=>c.group===g.id);if(!gc.length)return;
@@ -1545,33 +1559,58 @@ function setAllW(on){
 function renderAdCls(){
   const el=document.getElementById('adClsList');
   if(!D.classes.length){el.innerHTML='<p style="color:var(--muted);font-size:.84rem;padding:6px 0">No squads yet.</p>';return;}
-  const sorted=[...D.classes].sort((a,b)=>{
-    const gi=g=>GROUPS.findIndex(x=>x.id===g);
-    return gi(a.group)-gi(b.group)||a.name.localeCompare(b.name);
-  });
-  el.innerHTML=sorted.map(c=>{
+  const sortFn=(a,b)=>{const gi=g=>GROUPS.findIndex(x=>x.id===g);return gi(a.group)-gi(b.group)||a.name.localeCompare(b.name);};
+  const active=[...D.classes].filter(c=>!c.archived).sort(sortFn);
+  const archived=[...D.classes].filter(c=>c.archived).sort(sortFn);
+  let html='';
+  // Active squads
+  html+=active.map(c=>{
     const g=GROUPS.find(x=>x.id===c.group);
-    const n=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).length;
+    const n=D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id)).length;
+    const canArchive=n===0;
     return`<div class="ai">
       <div><div class="ai-name">${c.name} <span class="gbadge ${g.css}">${g.label}</span></div>
-      <div class="ai-sub">${c.day} · ${c.coach} · ${n} student${n!==1?'s':''}</div></div>
+      <div class="ai-sub">${c.day} · ${c.coach} · ${n} player${n!==1?'s':''}</div></div>
       <div class="ai-acts">
+        <button class="btn btn-xs btn-outline" onclick="viewSquadPlayers('${c.id}')" title="View players & manage leaves">Players</button>
         <button class="btn btn-xs btn-outline" onclick="editCls('${c.id}')">Edit</button>
-        <button class="btn btn-xs btn-red"     onclick="delCls('${c.id}')">Del</button>
+        <button class="btn btn-xs" style="background:${canArchive?'#92400e':'#3a3b44'};color:${canArchive?'#fff':'var(--muted)'};border-radius:8px;border:none;padding:6px 10px;cursor:${canArchive?'pointer':'not-allowed'};font-size:.72rem;font-weight:700"
+          onclick="${canArchive?`archiveCls('${c.id}')`:`toast('Remove all ${n} player${n!==1?'s':''} before archiving')`}" title="${canArchive?'Archive squad':'Remove all players before archiving'}">Archive</button>
       </div></div>`;
   }).join('');
+  // Archived squads section
+  if(archived.length){
+    html+=`<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">📦 Archived Squads (${archived.length})</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>`;
+    html+=archived.map(c=>{
+      const g=GROUPS.find(x=>x.id===c.group);
+      const weekStr=c.archivedAt?` · archived ${wkLbl(c.archivedAt)}`:'';
+      const attCount=Object.keys(D.attendance).filter(k=>k.startsWith(c.id+'_')).length;
+      return`<div class="ai" style="opacity:.7;border-left:3px solid var(--muted)">
+        <div><div class="ai-name">${c.name} <span class="gbadge ${g.css}">${g.label}</span> <span style="font-size:.68rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px">archived</span></div>
+        <div class="ai-sub">${c.day} · ${c.coach}${weekStr} · ${attCount} week${attCount!==1?'s':''} of data</div></div>
+        <div class="ai-acts">
+          <button class="btn btn-xs btn-outline" onclick="unarchiveCls('${c.id}')">Restore</button>
+          <button class="btn btn-xs btn-red" onclick="delCls('${c.id}')" title="Permanently delete squad and all attendance data">Delete</button>
+        </div></div>`;
+    }).join('');
+  }
+  el.innerHTML=html||'<p style="color:var(--muted);font-size:.84rem;padding:6px 0">No squads yet.</p>';
 }
 
 /* ── ADMIN: CHILDREN ── */
 function populateChFil(){
   const sel=document.getElementById('adChClsFil');
   sel.innerHTML='<option value="">All squads</option>';
-  D.classes.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+  D.classes.filter(c=>!c.archived).forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
 }
 function syncChFil(){
   const grp=document.getElementById('adChGrpFil').value;
   const sel=document.getElementById('adChClsFil');
-  const cls=grp?D.classes.filter(c=>c.group===grp):D.classes;
+  const cls=grp?D.classes.filter(c=>!c.archived&&c.group===grp):D.classes.filter(c=>!c.archived);
   sel.innerHTML='<option value="">All squads</option>';
   cls.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
   renderAdCh();
@@ -1605,7 +1644,7 @@ function renderAdCh(){
   const el=document.getElementById('adChList');
   let kids=D.children.filter(c=>!c.status||c.status==='active');
   if(cf)kids=kids.filter(c=>(c.classIds||[c.classId]).includes(cf));
-  else if(gf){const ids=D.classes.filter(c=>c.group===gf).map(c=>c.id);kids=kids.filter(c=>(c.classIds||[c.classId]).some(id=>ids.includes(id)));}
+  else if(gf){const ids=D.classes.filter(c=>!c.archived&&c.group===gf).map(c=>c.id);kids=kids.filter(c=>(c.classIds||[c.classId]).some(id=>ids.includes(id)));}
   kids=[...kids].sort((a,b)=>a.name.localeCompare(b.name));
   if(!kids.length){el.innerHTML='<p style="color:var(--muted);font-size:.84rem;padding:6px 0">No active children match filter.</p>';}
   else{
@@ -1809,20 +1848,65 @@ function saveCls(){
   saveD();closeMod('mCls');renderAdCls();toast('Squad saved ✓');
 }
 function delCls(id){
-  if(!confirm('Delete this squad and all its attendance data?'))return;
+  // Only allow hard delete if squad is already archived and has no active players
+  const activePlayers=D.children.filter(c=>(!c.status||c.status==='active')&&(c.classIds||[]).includes(id));
+  if(activePlayers.length>0){
+    toast(`Cannot delete — ${activePlayers.length} player${activePlayers.length!==1?'s':''} still in squad. Remove all players first.`);
+    return;
+  }
+  const cls=D.classes.find(c=>c.id===id);
+  if(!cls)return;
+  if(!cls.archived){
+    toast('Archive the squad first before deleting.');
+    return;
+  }
+  if(!confirm(`Permanently delete "${cls.name}" and all its attendance records? This cannot be undone.`))return;
   D.classes=D.classes.filter(c=>c.id!==id);
-  // Remove this class from each child's classIds; remove child only if they have no classes left
-  D.children=D.children.map(c=>{
-    c.classIds=(c.classIds||[c.classId]).filter(cid=>cid!==id);
-    return c;
-  }).filter(c=>c.classIds.length>0);
   Object.keys(D.attendance).forEach(k=>{if(k.startsWith(id+'_'))delete D.attendance[k];});
-  saveD();renderAdCls();toast('Deleted');
+  saveD();renderAdCls();toast('Squad permanently deleted');
+}
+function archiveCls(id){
+  const cls=D.classes.find(c=>c.id===id);if(!cls)return;
+  const activePlayers=D.children.filter(c=>(!c.status||c.status==='active')&&(c.classIds||[]).includes(id));
+  if(activePlayers.length>0){
+    toast(`Cannot archive — ${activePlayers.length} player${activePlayers.length!==1?'s are':' is'} still in this squad. Use "Players" to remove them first.`);
+    return;
+  }
+  if(!confirm(`Archive "${cls.name}"? Attendance data is kept. The squad will no longer appear in the active list.`))return;
+  const i=D.classes.findIndex(c=>c.id===id);
+  D.classes[i]={...D.classes[i],archived:true,archivedAt:toWK(new Date())};
+  saveD();renderAdCls();toast(`"${cls.name}" archived ✓`);
+}
+function unarchiveCls(id){
+  const i=D.classes.findIndex(c=>c.id===id);if(i<0)return;
+  D.classes[i]={...D.classes[i],archived:false,archivedAt:undefined};
+  saveD();renderAdCls();toast('Squad restored to active ✓');
+}
+function viewSquadPlayers(id){
+  const cls=D.classes.find(c=>c.id===id);if(!cls)return;
+  const players=D.children.filter(c=>(!c.status||c.status==='active')&&(c.classIds||[]).includes(id));
+  const el=document.getElementById('sqpList');
+  const title=document.getElementById('sqpTitle');
+  title.textContent=`Players in: ${cls.name}`;
+  if(!players.length){
+    el.innerHTML=`<p style="color:var(--muted);font-size:.88rem;padding:8px 0">No active players in this squad.<br><span style="font-size:.8rem">You can now archive this squad.</span></p>`;
+  } else {
+    el.innerHTML=players.sort((a,b)=>a.name.localeCompare(b.name)).map(ch=>{
+      return`<div class="ai" style="margin-bottom:6px">
+        <div><div class="ai-name">${ch.name}</div>
+        <div class="ai-sub">b. ${ch.birthYear}${ch.playerID?' · ID: '+ch.playerID:''}</div></div>
+        <div class="ai-acts">
+          <button class="btn btn-xs" style="background:#92400e;color:#fff;border-radius:8px;border:none;padding:6px 10px;cursor:pointer;font-size:.72rem;font-weight:700"
+            onclick="closeMod('mSqpList');openArchiveMod('${ch.id}')">Leave Squad</button>
+        </div></div>`;
+    }).join('');
+  }
+  openMod('mSqpList');
 }
 
 /* ── CHILD MODAL ── */
 function openChMod(){
-  if(!D.classes.length){toast('Add a squad first');return;}
+  if(!D.classes.filter(c=>!c.archived).length){toast('Add an active squad first');return;}
   document.getElementById('mChTit').textContent='Add Child';
   ['ch_id','ch_name','ch_yr','ch_pid'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ch_gm').checked=true;
@@ -1839,7 +1923,7 @@ function addChClsRow(selectedId){
   const sel=document.createElement('select');
   sel.className='fs';sel.style.flex='1';
   GROUPS.forEach(g=>{
-    const gc=D.classes.filter(c=>c.group===g.id).sort((a,b)=>a.name.localeCompare(b.name));
+    const gc=D.classes.filter(c=>!c.archived&&c.group===g.id).sort((a,b)=>a.name.localeCompare(b.name));
     if(!gc.length)return;
     const og=document.createElement('optgroup');og.label=g.label;
     gc.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;if(c.id===selectedId)o.selected=true;og.appendChild(o);});
@@ -2021,7 +2105,11 @@ function exportStatsJSON(){
 
   const squads=D.classes.map(c=>{
     const grp=GROUPS.find(g=>g.id===c.group)||GROUPS[0];
-    const players=D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id))
+    // Active squads: only current active players. Archived squads: all children who ever attended (active + archived)
+    const playerPool=c.archived
+      ? D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)||(ch.archivedFrom||[]).includes(c.id))
+      : D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id));
+    const players=playerPool
       .sort((a,b)=>a.name.localeCompare(b.name))
       .map(s=>{
         const weekData={};
@@ -2035,7 +2123,9 @@ function exportStatsJSON(){
       });
     let tp=0,ta=0;
     players.forEach(p=>{tp+=p.totalPresent;ta+=p.totalAbsent;});
-    return{id:c.id,name:c.name,groupId:c.group,groupLabel:grp.label,coach:c.coach,day:c.day,players,totalPresent:tp,totalAbsent:ta};
+    return{id:c.id,name:c.name,groupId:c.group,groupLabel:grp.label,coach:c.coach,day:c.day,
+      archived:c.archived||false,archivedAt:c.archivedAt||null,
+      players,totalPresent:tp,totalAbsent:ta};
   });
 
   // Build leavers data — both archived (left programme) and partial squad leavers
@@ -2115,7 +2205,7 @@ function exportExcel(){
 
   /* ── One sheet per group ── */
   GROUPS.forEach(g=>{
-    const squads=D.classes.filter(c=>c.group===g.id);
+    const squads=D.classes.filter(c=>!c.archived&&c.group===g.id);
     if(!squads.length)return;
 
     const aoa=[];       // array of arrays — raw cell values
@@ -2300,7 +2390,7 @@ function exportExcel(){
   /* ── SUMMARY sheet — one row per squad ── */
   const sRows=[['Group','Squad','Coach','Day','Players','Sessions','Total Present','Total Absent','Squad Avg %']];
   GROUPS.forEach(g=>{
-    D.classes.filter(c=>c.group===g.id).forEach(c=>{
+    D.classes.filter(c=>!c.archived&&c.group===g.id).forEach(c=>{
       const kids=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id));
       let tp=0,ta=0;
       kids.forEach(s=>aws.forEach(w=>{
@@ -2322,7 +2412,7 @@ function exportExcel(){
 
   /* ── COACH NOTES sheet ── */
   const nRows=[['Group','Squad','Coach','Week','Date','Notes']];
-  GROUPS.forEach(g=>D.classes.filter(c=>c.group===g.id).forEach(c=>{
+  GROUPS.forEach(g=>D.classes.filter(c=>!c.archived&&c.group===g.id).forEach(c=>{
     aws.forEach(w=>{
       const n=D.attendance[`${c.id}_${w}`]?.notes;
       if(n)nRows.push([g.label,c.name,c.coach,w,wkLbl(w),n]);
