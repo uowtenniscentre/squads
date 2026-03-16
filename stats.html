@@ -5,37 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Squads · Attendance Statistics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0d0d10;--surface:#13141a;--card:#1a1b22;--card2:#1f2029;
   --border:#25262f;--border2:#2e3040;--text:#e8eaf0;--muted:#5a5f72;--muted2:#8890a8;
-  --accent:#3b82f6;--present:#22c55e;--absent:#f87171;--holiday:#fbbf24;
+  --accent:#440379;--accent-light:#A499F4;--present:#22c55e;--absent:#f87171;--holiday:#fbbf24;
   --cdev:#fb923c;--cprepf:#c084fc;--cu11:#4ade80;--co11:#facc15;
   --mono:'JetBrains Mono',monospace;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
 
 .topbar{background:#000;border-bottom:1px solid rgba(255,255,255,.08);padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
 .topbar-title{font-size:1rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#fff;}
 .topbar-title span{color:var(--accent)}
 .topbar-meta{font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:right;line-height:1.6}
-.topbar-load{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.topbar-load{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:opacity .15s;}
 .topbar-load:hover{opacity:.85}
 
 #dropZone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 64px);padding:40px 20px;text-align:center;gap:24px;transition:background .2s;}
-#dropZone.drag-over{background:rgba(59,130,246,.06)}
-.drop-icon{width:88px;height:88px;border-radius:50%;background:rgba(59,130,246,.1);border:2px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:2.4rem;}
+#dropZone.drag-over{background:rgba(68,3,121,.06)}
+.drop-icon{width:88px;height:88px;border-radius:50%;background:rgba(68,3,121,.1);border:2px solid rgba(68,3,121,.25);display:flex;align-items:center;justify-content:center;font-size:2.4rem;}
 .drop-title{font-size:2rem;font-weight:800;color:#fff}
 .drop-sub{font-size:1rem;color:var(--muted2);max-width:420px;line-height:1.6}
-.drop-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px 32px;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.drop-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px 32px;font-family:'DM Sans',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .15s;}
 .drop-btn:hover{opacity:.85}
 .drop-hint{font-size:.78rem;color:var(--muted);font-family:var(--mono)}
 
 .tab-nav{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 28px;position:sticky;top:64px;z-index:90;}
-.tab-btn{padding:14px 20px;border:none;background:transparent;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
+.tab-btn{padding:14px 20px;border:none;background:transparent;color:var(--muted2);font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
 .tab-btn:hover:not(.on){color:var(--text)}
 .tab-btn.on{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-btn.ltab.on{color:#f87171;border-bottom-color:#f87171}
@@ -93,7 +93,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .heatmap-table th{padding:4px 6px;font-weight:700;font-family:var(--mono);font-size:.6rem;color:var(--muted);text-align:center;background:var(--card);border-bottom:1px solid var(--border);}
 .heatmap-table th.player-col{text-align:left;min-width:160px;max-width:200px}
 .heatmap-table td{padding:3px 4px;text-align:center;border:1px solid rgba(0,0,0,.2);font-family:var(--mono);font-size:.68rem;font-weight:600;}
-.heatmap-table td.player-name{text-align:left;padding:3px 10px 3px 6px;font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:600;color:var(--text);background:var(--card);border-right:2px solid var(--border2);min-width:160px;}
+.heatmap-table td.player-name{text-align:left;padding:3px 10px 3px 6px;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:600;color:var(--text);background:var(--card);border-right:2px solid var(--border2);min-width:160px;}
 .heatmap-table td.player-name .pid{font-size:.6rem;color:var(--muted);font-family:var(--mono);display:block;margin-top:1px}
 .heatmap-table td.stat-col{background:var(--card);border-left:2px solid var(--border2);font-weight:700;}
 .cell-p{background:#14532d;color:#4ade80}.cell-a{background:#450a0a;color:#f87171}
@@ -101,7 +101,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .cell-pct-hi{background:#14532d;color:#fff}.cell-pct-mid{background:#422006;color:#fff}.cell-pct-lo{background:#450a0a;color:#fff}
 
 .filter-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.ftab{padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .12s;}
+.ftab{padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--muted2);font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .12s;}
 .ftab.on{border-color:currentColor}
 .ftab:hover:not(.on){background:var(--card2)}
 .ftab.all{color:var(--text)}.ftab.all.on{background:var(--card2);border-color:var(--border2)}
@@ -402,7 +402,7 @@ function drawLine(ctx,W,H,pts,color,grad){
     let best=null,bd=Infinity;
     cv._pts.forEach(p=>{const d=Math.abs(p.x-mx);if(d<bd){bd=d;best=p;}});
     if(!best||bd>30){if(tip)tip.style.opacity='0';return;}
-    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#1a1b22;border:1px solid #2e3040;border-radius:8px;padding:8px 12px;font-size:.75rem;pointer-events:none;z-index:200;line-height:1.6;font-family:Outfit,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.5)';document.body.appendChild(tip);}
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#1a1b22;border:1px solid #2e3040;border-radius:8px;padding:8px 12px;font-size:.75rem;pointer-events:none;z-index:200;line-height:1.6;font-family:DM Sans,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.5)';document.body.appendChild(tip);}
     tip.innerHTML=`<div style="font-weight:800;color:#fff;margin-bottom:2px">S-W${String(best.wi+1).padStart(2,'0')}</div><div style="color:#22c55e;font-weight:700">${best.pct}% present</div><div style="color:#5a5f72">${best.p} present · ${best.a} absent</div>`;
     const bw=tip.offsetWidth||140,bh=tip.offsetHeight||70;
     let tx=e.clientX+14,ty=e.clientY-bh/2;
@@ -548,7 +548,7 @@ function renderLeaversTab(){
     pts.forEach(({wi,cum},i)=>{const x=P.l+(wi/(n-1||1))*cW;const y=P.t+cH*(1-cum/max);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
     ctx.lineTo(P.l+(pts[pts.length-1].wi/(n-1||1))*cW,P.t+cH);ctx.lineTo(P.l,P.t+cH);ctx.closePath();ctx.fillStyle=gr;ctx.fill();
   } else {
-    ctx.fillStyle='#5a5f72';ctx.textAlign='center';ctx.font='13px Outfit,sans-serif';
+    ctx.fillStyle='#5a5f72';ctx.textAlign='center';ctx.font='13px DM Sans,sans-serif';
     ctx.fillText('No programme-leaver data with week information.',W/2,H/2);
   }
 
