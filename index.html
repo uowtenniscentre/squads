@@ -884,13 +884,28 @@ const PW='Tennis';
 /* ── DATA ── */
 let D={classes:[],children:[],attendance:{},activeWeeks:[],seasonYear:2025};
 function loadD(){
-  try{const r=localStorage.getItem('ta_v10');if(r)D=JSON.parse(r);}catch(e){}
+  const raw=localStorage.getItem('ta_v10');
+  if(raw){
+    try{
+      const parsed=JSON.parse(raw);
+      D=parsed;
+    }catch(e){
+      // JSON was corrupted — do NOT overwrite with empty D, do NOT call initWeeks
+      // Show a persistent warning and bail out so real data isn't destroyed
+      console.error('ta_v10 parse failed — leaving data untouched',e);
+      setTimeout(()=>toast('⚠️ Data read error — please restore from backup JSON'),500);
+      return;
+    }
+  }
   // Migrate old single classId → classIds array
-  D.children=D.children.map(c=>{
+  D.children=(D.children||[]).map(c=>{
     if(!c.classIds){c.classIds=c.classId?[c.classId]:[];delete c.classId;}
     return c;
   });
-  if(!D.activeWeeks||!D.activeWeeks.length)initWeeks();
+  // Only initialise weeks if this is genuinely a fresh install (no classes, no children, no attendance)
+  const isFresh=!D.classes?.length&&!D.children?.length&&!Object.keys(D.attendance||{}).length;
+  if((!D.activeWeeks||!D.activeWeeks.length)&&isFresh)initWeeks();
+  else if(!D.activeWeeks||!D.activeWeeks.length)D.activeWeeks=[];
 }
 function saveD(){
   try{localStorage.setItem('ta_v10',JSON.stringify(D));}

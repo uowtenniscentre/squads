@@ -16,7 +16,7 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;overscroll-behavior:none;overflow:hidden;height:100dvh;}
 
 
 #dropZone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 100px);padding:40px 20px;text-align:center;gap:24px;transition:background .2s;}
@@ -140,7 +140,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cnb.on{background:var(--accent);color:#1a0030}
 .cnb .cnb-lbl{font-size:.7rem;font-weight:700;letter-spacing:.5px}
 .cnb-divider{width:76px;height:1px;background:rgba(255,255,255,.08);flex-shrink:0;margin-bottom:10px}
-.stats-main{position:fixed;left:100px;top:100px;right:0;bottom:0;overflow-y:auto;background:var(--bg)}
+.stats-main{position:fixed;left:100px;top:100px;right:0;bottom:0;overflow-y:auto;background:var(--bg);overscroll-behavior:none;}
 .stats-inner{padding:24px 28px 60px;max-width:1200px;margin:0 auto}
 </style>
 </head>
@@ -451,6 +451,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 });
 function showTab(id){
   activeTab=id;
+  try{sessionStorage.setItem('stats_tab',id);}catch(e){}
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.cnb').forEach(b=>b.classList.remove('on'));
   document.getElementById('tab-'+id).classList.add('on');
@@ -479,7 +480,9 @@ function readFile(f){
     try{
       const d=JSON.parse(ev.target.result);
       if(!d.squads||!d.weeks)throw new Error('Not a valid stats export');
-      SD=d;showDashboard();
+      SD=d;
+      try{sessionStorage.setItem('stats_sd',ev.target.result);}catch(e){}
+      showDashboard();
     }catch(err){toast('Invalid file: '+err.message);}
   };
   r.readAsText(f);
@@ -930,6 +933,21 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 /* resize */
 let _rt;
 window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(SD){if(activeTab==='overview')renderTrend();if(activeTab==='leavers')renderLeaversTab();}},120);});
+
+/* ── SESSION RESTORE — recover after browser-triggered reload ── */
+(function(){
+  try{
+    const raw=sessionStorage.getItem('stats_sd');
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    if(!d.squads||!d.weeks)return;
+    SD=d;
+    showDashboard();
+    // Restore the tab the user was on
+    const tab=sessionStorage.getItem('stats_tab');
+    if(tab&&document.getElementById('tab-'+tab))showTab(tab);
+  }catch(e){}
+})();
 </script>
 
 // Portrait lock
