@@ -1780,6 +1780,27 @@ function clearSquadLeaves(id){
   D.children=D.children.map(c=>c.id===id?{...c,squadLeaves:[]}:c);
   saveD();renderLeavers();
 }
+// Opens the Leave Squad modal pre-scoped to a single squad (called from child edit page)
+function openArchiveModForSquad(childId, squadId){
+  const ch=D.children.find(c=>c.id===childId);if(!ch)return;
+  const cids=ch.classIds||[];
+  const checks=document.getElementById('archiveSquadChecks');
+  checks.innerHTML=cids.map(cid=>{
+    const cls=D.classes.find(x=>x.id===cid);if(!cls)return'';
+    const checked=cid===squadId;
+    return`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">
+      <input type="checkbox" value="${cid}" ${checked?'checked':''} style="width:15px;height:15px;accent-color:#A499F4">
+      ${cls.name}
+    </label>`;
+  }).join('');
+  document.getElementById('archiveChildId').value=childId;
+  document.getElementById('archiveWeek').value=toWK(new Date());
+  document.getElementById('archiveReason').value='';
+  document.getElementById('archiveReasonNote').value='';
+  document.getElementById('archiveReasonNoteWrap').style.display='none';
+  document.getElementById('archiveConfirmBtn').textContent='Confirm Leave';
+  openMod('mArchive');
+}
 function openArchiveMod(id){
   const ch=D.children.find(c=>c.id===id);if(!ch)return;
   const cids=ch.classIds||[];
@@ -1931,7 +1952,7 @@ function openChMod(){
   addChClsRow();
   openMod('mCh');
 }
-function addChClsRow(selectedId){
+function addChClsRow(selectedId, isSaved=false){
   const list=document.getElementById('chClsList');
   const row=document.createElement('div');
   row.style.cssText='display:flex;gap:6px;align-items:center';
@@ -1944,11 +1965,28 @@ function addChClsRow(selectedId){
     gc.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;if(c.id===selectedId)o.selected=true;og.appendChild(o);});
     sel.appendChild(og);
   });
-  const rm=document.createElement('button');
-  rm.type='button';rm.textContent='✕';
-  rm.style.cssText='flex-shrink:0;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;color:var(--muted);font-size:.85rem';
-  rm.onclick=()=>{if(list.children.length>1)list.removeChild(row);else toast('At least one squad required');};
-  row.appendChild(sel);row.appendChild(rm);
+  if(isSaved){
+    // This squad is already committed — removing it is a departure, not a correction.
+    // Lock the dropdown and show a Leave Squad button that opens the proper leaving flow.
+    sel.disabled=true;
+    sel.style.opacity='0.7';
+    const leaveBtn=document.createElement('button');
+    leaveBtn.type='button';leaveBtn.textContent='Leave Squad →';
+    leaveBtn.style.cssText='flex-shrink:0;padding:8px 12px;border-radius:8px;border:1.5px solid #92400e;background:transparent;cursor:pointer;color:#fbbf24;font-size:.78rem;font-weight:700;white-space:nowrap';
+    leaveBtn.onclick=()=>{
+      const childId=document.getElementById('ch_id').value;
+      closeMod('mCh');
+      openArchiveModForSquad(childId, selectedId);
+    };
+    row.appendChild(sel);row.appendChild(leaveBtn);
+  } else {
+    // Newly added this session — not yet saved, safe to just remove.
+    const rm=document.createElement('button');
+    rm.type='button';rm.textContent='✕';
+    rm.style.cssText='flex-shrink:0;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;color:var(--muted);font-size:.85rem';
+    rm.onclick=()=>{if(list.children.length>1)list.removeChild(row);else toast('At least one squad required');};
+    row.appendChild(sel);row.appendChild(rm);
+  }
   list.appendChild(row);
 }
 function editCh(id){
@@ -1962,7 +2000,7 @@ function editCh(id){
   const list=document.getElementById('chClsList');
   list.innerHTML='';
   const ids=ch.classIds||[];
-  if(ids.length){ids.forEach(cid=>addChClsRow(cid));}
+  if(ids.length){ids.forEach(cid=>addChClsRow(cid, true));}
   else{addChClsRow();}
   openMod('mCh');
 }
@@ -1980,16 +2018,7 @@ function saveCh(){
   if(id){
     const i=D.children.findIndex(c=>c.id===id);
     const prev=D.children[i];
-    const prevIds=prev.classIds||[];
-    const removedIds=prevIds.filter(cid=>!classIds.includes(cid));
-    // If squads were silently removed via ✕, log them as squad leaves
-    if(removedIds.length){
-      const week=toWK(new Date());
-      const leaves=[...(prev.squadLeaves||[]),{classIds:removedIds,week,reason:'Removed via edit'}];
-      D.children[i]={...prev,...obj,squadLeaves:leaves};
-    } else {
-      D.children[i]={...prev,...obj};
-    }
+    D.children[i]={...prev,...obj};
   } else {
     D.children.push({id:uid(),...obj});
   }
