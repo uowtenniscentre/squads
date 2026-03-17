@@ -2078,7 +2078,8 @@ function runAutoBackup(manual=false){
   const today=new Date().toISOString().split('T')[0];
   const filename=`squads-backup-${today}.json`;
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));
+  const backup={...D,_exportedAt:new Date().toISOString()};
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
   a.download=filename;
   document.body.appendChild(a);
   a.click();
@@ -2134,7 +2135,8 @@ function renderAutoBackupCard(){
 /* ── BACKUP / RESTORE ── */
 function exportJSON(){
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));
+  const backup={...D,_exportedAt:new Date().toISOString()};
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
   a.download=`tennis-backup-${new Date().toISOString().split('T')[0]}.json`;
   a.click();toast('Backup downloaded ✓');
 }
@@ -2145,11 +2147,19 @@ function importJSON(){
     r.onload=ev=>{
       try{
         const p=JSON.parse(ev.target.result);
-        if(p.attendance)D.attendance={...p.attendance,...D.attendance};
-        D.classes=p.classes||D.classes;D.children=p.children||D.children;
-        D.activeWeeks=p.activeWeeks||D.activeWeeks;D.seasonYear=p.seasonYear||D.seasonYear;
-        saveD();renderAdCls();renderAdCh();renderGroups();toast('Imported ✓');
-      }catch{toast('Invalid file');}
+        // Validate it looks like a real backup
+        if(!p.classes||!p.children||!p.attendance){toast('Invalid backup file — missing data');return;}
+        const squadCount=p.classes?.length||0;
+        const childCount=p.children?.length||0;
+        const backupDate=p._exportedAt?new Date(p._exportedAt).toLocaleString('en-GB'):'unknown date';
+        if(!confirm(`⚠️ RESTORE FROM BACKUP\n\nThis will completely replace ALL current app data with this backup:\n• ${squadCount} squad${squadCount!==1?'s':''}\n• ${childCount} player${childCount!==1?'s':''}\n• Backed up: ${backupDate}\n\nAll current squads, players and attendance records will be lost.\n\nContinue?`))return;
+        if(!confirm('Last confirmation — this cannot be undone.\n\nReplace everything with the backup?'))return;
+        // Full overwrite — exactly what was backed up is restored
+        D=p;
+        saveD();
+        renderAdCls();renderAdCh();renderGroups();renderToday();
+        toast('Backup restored ✓ — all data replaced');
+      }catch{toast('Invalid file — could not parse backup');}
     };
     r.readAsText(e.target.files[0]);
   };
