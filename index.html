@@ -505,6 +505,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
     <button class="anb" id="anb-classes"  onclick="goAdmin('classes')">🎾 Squads</button>
     <button class="anb" id="anb-children" onclick="goAdmin('children')">👦 Children</button>
     <button class="anb" id="anb-holidays" onclick="goAdmin('holidays')">🗓 Holidays</button>
+    <button class="anb" id="anb-income"   onclick="goAdmin('income')">💰 Monthly Income</button>
     <button class="anb" id="anb-data"     onclick="goAdmin('data')">💾 Data</button>
   </nav>
 
@@ -612,6 +613,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
           <button class="btn btn-sm btn-outline" onclick="setAllW(false)">Clear All</button>
         </div>
         <div class="wgrid" id="wgrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ap: MONTHLY INCOME -->
+  <div class="ap-page" id="ap-income">
+    <div style="padding:4px 0 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div class="pg-title">Monthly Income</div>
+      <button onclick="openIncPriceModal()" style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:7px 16px;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:var(--accent);cursor:pointer">💰 Squads DD Prices</button>
+    </div>
+    <div id="incomeGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:8px"></div>
+  </div>
+
+  <!-- INCOME PRICE MODAL -->
+  <div id="incPriceBg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:28px 28px 22px;width:360px;max-width:92vw">
+      <div style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:6px">💰 Monthly Prices per Group</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:20px;line-height:1.5">Set the monthly fee per squad place for each group. Prices are charged per squad per player.</div>
+      <div id="incPriceRows"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+        <button onclick="closeIncPriceModal()" style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;color:var(--muted);cursor:pointer">Cancel</button>
+        <button onclick="saveIncPrices()" style="background:var(--accent);border:none;border-radius:8px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;color:#1a0030;cursor:pointer">Save Prices</button>
       </div>
     </div>
   </div>
@@ -1016,6 +1039,7 @@ function goAdmin(p){
     populateChFil();renderAdCh();
   }
   if(p==='holidays') renderCal();
+  if(p==='income')   renderAdIncome();
   if(p==='data')     renderAutoBackupCard();
 }
 
@@ -2638,6 +2662,88 @@ if(screen.orientation&&screen.orientation.lock){
 window.addEventListener('resize',checkOrientation);
 window.addEventListener('orientationchange',checkOrientation);
 checkOrientation();
+
+/* ── MONTHLY INCOME ── */
+const INC_PRICE_KEY='stats_grp_prices'; // shared key with stats.html
+const INC_DEFAULT={development:35.50,'pre-performance':49.50,'u11-performance':49.50,'o11-performance':59.50};
+const GRP_COLORS={dev:'#fb923c',prepf:'#c084fc',u11:'#4ade80',o11:'#facc15'};
+const GRP_BG={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
+const GRP_BR={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
+
+function loadIncPrices(){try{const s=localStorage.getItem(INC_PRICE_KEY);return s?JSON.parse(s):{...INC_DEFAULT};}catch{return{...INC_DEFAULT};}}
+function saveIncPricesStore(obj){try{localStorage.setItem(INC_PRICE_KEY,JSON.stringify(obj));}catch(e){}}
+
+function openIncPriceModal(){
+  const prices=loadIncPrices();
+  document.getElementById('incPriceRows').innerHTML=GROUPS.map(g=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;flex:1">
+        <div style="width:10px;height:10px;border-radius:50%;background:${GRP_COLORS[g.css]};flex-shrink:0"></div>
+        <span style="font-size:.82rem;font-weight:700;color:var(--text)">${g.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;width:110px">
+        <span style="font-size:.85rem;font-weight:700;color:var(--muted)">£</span>
+        <input type="number" min="0" step="0.50" id="ipp_${g.id}" value="${(prices[g.id]||0).toFixed(2)}"
+          style="background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:.85rem;font-weight:700;width:70px;text-align:right">
+      </div>
+    </div>`).join('');
+  const bg=document.getElementById('incPriceBg');
+  bg.style.display='flex';
+}
+function closeIncPriceModal(){document.getElementById('incPriceBg').style.display='none';}
+function saveIncPrices(){
+  const prices={};
+  GROUPS.forEach(g=>{prices[g.id]=parseFloat(document.getElementById('ipp_'+g.id).value)||0;});
+  saveIncPricesStore(prices);
+  closeIncPriceModal();
+  renderAdIncome();
+}
+document.getElementById('incPriceBg').addEventListener('click',function(e){if(e.target===this)closeIncPriceModal();});
+
+function renderAdIncome(){
+  const prices=loadIncPrices();
+  const fmt=v=>'£'+v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const activeClasses=D.classes.filter(c=>!c.archived);
+
+  const grpIncome=GROUPS.map(g=>{
+    const sqs=activeClasses.filter(c=>c.group===g.id);
+    // Count per-squad (includes duplicates — player in 2 squads counts twice)
+    const playerCount=sqs.reduce((s,sq)=>{
+      return s+D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[]).includes(sq.id)).length;
+    },0);
+    const price=prices[g.id]||0;
+    const income=playerCount*price;
+    return{g,playerCount,price,income};
+  });
+  const totalIncome=grpIncome.reduce((s,x)=>s+x.income,0);
+  const hasIncome=grpIncome.some(x=>x.playerCount>0&&x.price>0);
+
+  const totalBreakdown=grpIncome.filter(x=>x.playerCount>0&&x.price>0)
+    .map(x=>`<div style="display:flex;justify-content:space-between;gap:12px">
+      <span style="color:${GRP_COLORS[x.g.css]};font-weight:600">${x.g.label}</span>
+      <span style="font-family:var(--mono);color:rgba(255,255,255,.5)">${x.playerCount} players × ${fmt(x.price)} = ${fmt(x.income)}</span>
+    </div>`).join('');
+
+  const gCards=grpIncome.filter(x=>x.playerCount>0&&x.price>0);
+  while(gCards.length<4)gCards.push(null);
+  const rightCards=gCards.slice(0,4).map((x,i)=>x?`
+    <div style="background:${GRP_BG[x.g.css]};border:1.5px solid ${GRP_BR[x.g.css]};border-radius:12px;padding:14px 16px;grid-column:${3+(i%2)};grid-row:${Math.floor(i/2)+1}">
+      <div style="font-size:1.4rem;font-weight:900;font-family:var(--mono);line-height:1;color:${GRP_COLORS[x.g.css]}">${fmt(x.income)}</div>
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:${GRP_COLORS[x.g.css]};margin-top:5px">${x.g.label}</div>
+      <div style="font-size:.72rem;color:rgba(255,255,255,.45);margin-top:6px;line-height:1.6;font-family:var(--mono)">${x.playerCount} player${x.playerCount!==1?'s':''} × ${fmt(x.price)}/mo</div>
+    </div>`:'').join('');
+
+  document.getElementById('incomeGrid').innerHTML=hasIncome?`
+    <div style="background:#131a1f;border:1.5px solid #1e3a2e;border-radius:12px;padding:14px 16px;grid-column:1/3;grid-row:1/3">
+      <div style="font-size:1.6rem;font-weight:900;font-family:var(--mono);line-height:1;color:#4ade80">${fmt(totalIncome)}</div>
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#4ade80;margin-top:5px">Monthly Income (All Squads)</div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:7px;font-size:.76rem">${totalBreakdown}</div>
+    </div>
+    ${rightCards}`
+    :`<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted);font-size:.9rem">
+        No price data. Click <strong style="color:var(--accent)">Edit Group Prices</strong> to set monthly fees.
+      </div>`;
+}
 
 </script>
 </body>

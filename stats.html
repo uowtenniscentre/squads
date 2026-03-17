@@ -38,6 +38,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .season-weeks{font-family:var(--mono);font-size:.75rem;color:var(--accent)}
 .season-bar-right{margin-left:auto}
 
+/* ── PRICE MODAL ── */
+.price-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;}
+.price-modal-bg.open{display:flex}
+.price-modal{background:var(--card);border:1.5px solid var(--border2);border-radius:16px;padding:28px 28px 22px;width:360px;max-width:92vw;}
+.price-modal h3{font-size:1rem;font-weight:800;color:var(--text);margin-bottom:6px}
+.price-modal p{font-size:.75rem;color:var(--muted2);margin-bottom:20px;line-height:1.5}
+.price-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.price-row label{font-size:.8rem;font-weight:700;color:var(--text);flex:1}
+.price-input-wrap{display:flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--border2);border-radius:8px;padding:6px 10px;width:110px}
+.price-input-wrap span{font-size:.85rem;font-weight:700;color:var(--muted2)}
+.price-input{background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:.85rem;font-weight:700;width:70px;text-align:right}
+.price-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.price-modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.pm-btn{border:none;border-radius:8px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer}
+.pm-btn.cancel{background:var(--surface);color:var(--muted2)}
+.pm-btn.save{background:var(--accent);color:#1a0030}
+
 .sec-title{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);margin-bottom:14px;margin-top:32px;display:flex;align-items:center;gap:8px;}
 .sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
 
@@ -354,13 +371,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div><div class="season-bar-label">Season</div><div class="season-info" id="sbSeason">—</div></div>
     <div><div class="season-bar-label">Coaching Weeks</div><div class="season-weeks" id="sbWeeks">—</div></div>
     <div><div class="season-bar-label">Exported</div><div class="season-weeks" id="sbExported">—</div></div>
-    <div class="season-bar-right" id="sbRight"></div>
+    <div class="season-bar-right" id="sbRight"><button onclick="openPriceModal()" style="background:var(--card);border:1.5px solid var(--border2);border-radius:8px;padding:6px 14px;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:700;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:6px">💰 Squads DD Prices</button></div>
   </div>
 
   <!-- OVERVIEW -->
   <div class="tab-page on" id="tab-overview">
     <div class="sec-title">Season KPIs</div>
     <div class="kpi-row" id="kpiRow"></div>
+    <div class="sec-title" id="incomeSecTitle" style="display:none">Monthly Income</div>
+    <div class="kpi-row" id="incomeRow" style="display:none"></div>
     <div class="sec-title">By Programme Group</div>
     <div class="grp-row" id="grpRow"></div>
     <div class="sec-title">Season Attendance Trend <span style="font-size:.6rem;font-weight:400;color:var(--muted);margin-left:4px">weekly % present</span></div>
@@ -514,6 +533,35 @@ function showDashboard(){
 }
 
 /* ── KPIs ── */
+/* ── PRICE SETTINGS ── */
+const PRICE_KEY='stats_grp_prices';
+const DEFAULT_PRICES={development:35.50,'pre-performance':49.50,'u11-performance':49.50,'o11-performance':59.50};
+function loadPrices(){try{const s=localStorage.getItem(PRICE_KEY);return s?JSON.parse(s):{...DEFAULT_PRICES};}catch{return{...DEFAULT_PRICES};}}
+function openPriceModal(){
+  const prices=loadPrices();
+  document.getElementById('priceRows').innerHTML=GROUPS.map(g=>`
+    <div class="price-row">
+      <div style="display:flex;align-items:center;gap:8px;flex:1">
+        <div class="price-dot" style="background:${g.color}"></div>
+        <label>${g.label}</label>
+      </div>
+      <div class="price-input-wrap">
+        <span>£</span>
+        <input class="price-input" type="number" min="0" step="0.50" id="pi_${g.id}" value="${(prices[g.id]||0).toFixed(2)}">
+      </div>
+    </div>`).join('');
+  document.getElementById('priceModalBg').classList.add('open');
+}
+function closePriceModal(){document.getElementById('priceModalBg').classList.remove('open');}
+function savePrices(){
+  const prices={};
+  GROUPS.forEach(g=>{const v=parseFloat(document.getElementById('pi_'+g.id).value)||0;prices[g.id]=v;});
+  try{localStorage.setItem(PRICE_KEY,JSON.stringify(prices));}catch(e){}
+  closePriceModal();
+  renderKPIs();
+}
+document.getElementById('priceModalBg').addEventListener('click',function(e){if(e.target===this)closePriceModal();});
+
 function renderKPIs(){
   const activeSqs=SD.squads.filter(sq=>!sq.archived);
   const allP=activeSqs.reduce((s,sq)=>s+sq.totalPresent,0);
@@ -525,11 +573,55 @@ function renderKPIs(){
   const best=ranked[0];const worst=ranked[ranked.length-1];
   const lc=(SD.leavers||[]).filter(l=>l.leftProgramme).length;
   const archivedCount=SD.squads.filter(sq=>sq.archived).length;
+
+  // Income calculations
+  const prices=loadPrices();
+  const grpIncome=GROUPS.map(g=>{
+    const sqs=activeSqs.filter(sq=>sq.groupId===g.id);
+    const playerCount=sqs.reduce((s,sq)=>s+sq.players.length,0);
+    const price=prices[g.id]||0;
+    const income=playerCount*price;
+    return{g,playerCount,price,income};
+  });
+  const totalIncome=grpIncome.reduce((s,x)=>s+x.income,0);
+  const fmt=v=>'\u00a3'+v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const hasIncome=grpIncome.some(x=>x.playerCount>0&&x.price>0);
+
+  // Total breakdown: one line per contributing group
+  const totalBreakdown=grpIncome.filter(x=>x.playerCount>0&&x.price>0)
+    .map(x=>`<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:${x.g.color};font-weight:600">${x.g.label}</span><span style="font-family:var(--mono);color:var(--muted2)">${x.playerCount} players \u00d7 ${fmt(x.price)} = ${fmt(x.income)}</span></div>`)
+    .join('');
+
+  // Per-group income cards — use same bg/border palette as programme group cards
+  const bgM={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
+  const brM={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
+
+  document.getElementById('incomeSecTitle').style.display=hasIncome?'flex':'none';
+  document.getElementById('incomeRow').style.display=hasIncome?'grid':'none';
+  document.getElementById('incomeRow').style.gridTemplateColumns='1fr 1fr 1fr 1fr';
+  document.getElementById('incomeRow').style.gridTemplateRows='auto auto';
+  if(hasIncome){
+    const gCards=grpIncome.filter(x=>x.playerCount>0&&x.price>0);
+    // Pad to 4 slots so the 2x2 right side always fills correctly
+    while(gCards.length<4)gCards.push(null);
+    const rightCards=gCards.slice(0,4).map((x,i)=>x?`
+      <div class="kpi" style="background:${bgM[x.g.css]};border-color:${brM[x.g.css]};grid-column:${3+(i%2)};grid-row:${Math.floor(i/2)+1}">
+        <div class="kpi-n" style="color:${x.g.color};font-size:1.4rem">${fmt(x.income)}</div>
+        <div class="kpi-l" style="color:${x.g.color}">${x.g.label}</div>
+        <div class="kpi-sub" style="margin-top:6px;line-height:1.6;color:rgba(255,255,255,.45)">${x.playerCount} player${x.playerCount!==1?'s':''} \u00d7 ${fmt(x.price)}/mo</div>
+      </div>`:'').join('');
+    document.getElementById('incomeRow').innerHTML=`
+      <div class="kpi" style="grid-column:1/3;grid-row:1/3;background:#131a1f;border-color:#1e3a2e">
+        <div class="kpi-n" style="color:#4ade80;font-size:1.6rem">${fmt(totalIncome)}</div>
+        <div class="kpi-l" style="color:#4ade80">Monthly Income (All Squads)</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:7px;font-size:.76rem">${totalBreakdown}</div>
+      </div>
+      ${rightCards}`;
+  }
+
   document.getElementById('kpiRow').innerHTML=`
     <div class="kpi"><div class="kpi-n" style="color:var(--present)">${pct}%</div><div class="kpi-l">Season Average</div><div class="kpi-sub">${allP}P · ${allA}A</div></div>
     <div class="kpi"><div class="kpi-n">${allPlayers}</div><div class="kpi-l">Active Players</div><div class="kpi-sub">across ${activeSqs.length} squad${activeSqs.length!==1?'s':''}</div></div>
-    <div class="kpi"><div class="kpi-n">${SD.weeks.length}</div><div class="kpi-l">Coaching Weeks</div><div class="kpi-sub">S-W01 – S-W${String(SD.weeks.length).padStart(2,'0')}</div></div>
-    <div class="kpi"><div class="kpi-n">${allP+allA}</div><div class="kpi-l">Total Records</div><div class="kpi-sub">${allP} present · ${allA} absent</div></div>
     ${lc?`<div class="kpi"><div class="kpi-n" style="color:#f87171">${lc}</div><div class="kpi-l">Left Programme</div><div class="kpi-sub">this season</div></div>`:''}
     ${archivedCount?`<div class="kpi"><div class="kpi-n" style="color:var(--muted)">${archivedCount}</div><div class="kpi-l">Archived Squads</div><div class="kpi-sub">data preserved</div></div>`:''}
     ${best?`<div class="kpi"><div class="kpi-n" style="color:var(--present);font-size:1.3rem">${Math.round(best.totalPresent/(best.totalPresent+best.totalAbsent)*100)}%</div><div class="kpi-l">Best Squad</div><div class="kpi-sub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${best.name}</div></div>`:''}
@@ -960,5 +1052,18 @@ if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landsca
 window.addEventListener('resize',checkOrientation);
 window.addEventListener('orientationchange',checkOrientation);
 checkOrientation();
+
+<!-- PRICE SETTINGS MODAL -->
+<div class="price-modal-bg" id="priceModalBg">
+  <div class="price-modal">
+    <h3>💰 Monthly Prices per Group</h3>
+    <p>Set the monthly subscription fee for each programme group. These prices are used to calculate income statistics.</p>
+    <div id="priceRows"></div>
+    <div class="price-modal-footer">
+      <button class="pm-btn cancel" onclick="closePriceModal()">Cancel</button>
+      <button class="pm-btn save" onclick="savePrices()">Save Prices</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
