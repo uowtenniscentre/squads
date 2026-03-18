@@ -11,7 +11,7 @@
   --bg:#0d0d10;--surface:#13141a;--card:#1a1b22;--card2:#1f2029;
   --border:#25262f;--border2:#2e3040;--text:#e8eaf0;--muted:#5a5f72;--muted2:#8890a8;
   --accent:#A499F4;--accent-light:#A499F4;--present:#22c55e;--absent:#f87171;--holiday:#fbbf24;
-  --cdev:#fb923c;--cprepf:#c084fc;--cu11:#4ade80;--co11:#facc15;
+  --cdev:#38bdf8;--cprepf:#c084fc;--cu11:#4ade80;--co11:#facc15;
   --mono:'JetBrains Mono',monospace;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -111,7 +111,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .ftab.on{border-color:currentColor}
 .ftab:hover:not(.on){background:var(--card2)}
 .ftab.all{color:var(--text)}.ftab.all.on{background:var(--card2);border-color:var(--border2)}
-.ftab.dev{color:var(--cdev)}.ftab.dev.on{background:rgba(251,146,60,.1)}
+.ftab.dev{color:var(--cdev)}.ftab.dev.on{background:rgba(56,189,248,.1)}
 .ftab.prepf{color:var(--cprepf)}.ftab.prepf.on{background:rgba(192,132,252,.1)}
 .ftab.u11{color:var(--cu11)}.ftab.u11.on{background:rgba(74,222,128,.1)}
 .ftab.o11{color:var(--co11)}.ftab.o11.on{background:rgba(250,204,21,.1)}
@@ -456,7 +456,7 @@ let trendGroupSel='all',squadGroupSel='all',heatmapGroupSel='all',leaverProgGrou
 let activeTab='overview';
 
 const GROUPS=[
-  {id:'development',    label:'Development',       css:'dev',  color:'#fb923c'},
+  {id:'development',    label:'Development',       css:'dev',  color:'#38bdf8'},
   {id:'pre-performance',label:'Pre-Performance',   css:'prepf',color:'#c084fc'},
   {id:'u11-performance',label:'U11 Performance',   css:'u11',  color:'#4ade80'},
   {id:'o11-performance',label:'Over11 Performance',css:'o11',  color:'#facc15'},
@@ -593,8 +593,8 @@ function renderKPIs(){
     .join('');
 
   // Per-group income cards — use same bg/border palette as programme group cards
-  const bgM={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
-  const brM={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
+  const bgM={dev:'#0a1929',prepf:'#25123c',u11:'#112614',o11:'#242208'};
+  const brM={dev:'#0e3a5c',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
 
   document.getElementById('incomeSecTitle').style.display=hasIncome?'flex':'none';
   document.getElementById('incomeRow').style.display=hasIncome?'grid':'none';
@@ -631,8 +631,8 @@ function renderKPIs(){
 
 /* ── GROUP CARDS ── */
 function renderGroupCards(){
-  const bgM={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
-  const brM={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
+  const bgM={dev:'#0a1929',prepf:'#25123c',u11:'#112614',o11:'#242208'};
+  const brM={dev:'#0e3a5c',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
   const stats=GROUPS.map(g=>{
     const sqs=SD.squads.filter(sq=>!sq.archived&&sq.groupId===g.id);
     const p=sqs.reduce((s,sq)=>s+sq.totalPresent,0);
@@ -813,8 +813,8 @@ function renderLeaversTab(){
   `;
 
   /* Group breakdown */
-  const bgM={dev:'#29200a',prepf:'#25123c',u11:'#112614',o11:'#242208'};
-  const brM={dev:'#4a3214',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
+  const bgM={dev:'#0a1929',prepf:'#25123c',u11:'#112614',o11:'#242208'};
+  const brM={dev:'#0e3a5c',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
   const grpL=GROUPS.map(g=>{
     const ids=SD.squads.filter(s=>s.groupId===g.id).map(s=>s.id);
     const gp=prog.filter(l=>(l.squads||[]).some(s=>ids.includes(s.id)));
