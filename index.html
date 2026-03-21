@@ -3301,11 +3301,9 @@ window.addEventListener('resize',checkOrientation);
 window.addEventListener('orientationchange',checkOrientation);
 checkOrientation();
 
-/* ── PIN LOCK ON BACKGROUND/SCREEN LOCK ──
-   If the app has been hidden (screen locked, app swiped away) for longer than
-   PIN_LOCK_MS, encKey is cleared and PIN re-prompted when the app becomes visible again.
-   This protects shared tablets where a coach walks away without fully closing the app. */
-const PIN_LOCK_MS = 60 * 1000; // 60 seconds
+// PIN LOCK: if app hidden (screen lock / swipe away) for longer than PIN_LOCK_MS ms,
+// encKey is cleared and PIN is re-prompted when app becomes visible again.
+const PIN_LOCK_MS = 60000; // 60 seconds
 let _hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
@@ -3319,7 +3317,9 @@ document.addEventListener('visibilitychange', () => {
     }
     _hiddenAt = 0;
   }
-}); */
+});
+
+/* ── MONTHLY INCOME ── */
 const INC_PRICE_KEY='stats_grp_prices'; // shared key with stats.html
 const INC_DEFAULT={development:35.50,'pre-performance':49.50,'u11-performance':49.50,'o11-performance':59.50};
 const GRP_COLORS={dev:'#38bdf8',prepf:'#c084fc',u11:'#4ade80',o11:'#facc15'};
