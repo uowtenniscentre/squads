@@ -1137,6 +1137,10 @@ async function loadNames(key){
 
 /* ── SECURITY FLOW ── */
 async function checkSecurity(){
+  // If a setup just completed but the page was reloaded (e.g. by service worker activating),
+  // re-show the recovery modal so the admin can note down their PIN.
+  const pendingPin=sessionStorage.getItem('pendingRecoveryPin');
+  if(pendingPin){showRecoveryModal(pendingPin);return;}
   const hasPw=!!localStorage.getItem(ADMIN_PW_KEY);
   const hasNames=!!localStorage.getItem(NAMES_KEY);
   if(!hasPw){showFirstTimeSetup();return;}
@@ -1213,10 +1217,11 @@ async function completeSetup(){
     // Always write ta_v10_names — ensures PIN prompt fires on next open even with zero children
     await saveNames();
     if(D.children.length>0){saveD();}
+    // Persist PIN so recovery modal survives a service-worker-triggered page reload
+    sessionStorage.setItem('pendingRecoveryPin',pin);
     // Show recovery code screen
     document.getElementById('setupScreen').style.display='none';
-    document.getElementById('recoveryCodeDisplay').textContent=pin;
-    document.getElementById('recoveryModal').style.display='flex';
+    showRecoveryModal(pin);
   }catch(e){
     // Re-show setup screen in case it was hidden before the error occurred
     document.getElementById('setupScreen').style.display='flex';
@@ -1226,7 +1231,12 @@ async function completeSetup(){
     console.error(e);
   }
 }
+function showRecoveryModal(pin){
+  document.getElementById('recoveryCodeDisplay').textContent=pin;
+  document.getElementById('recoveryModal').style.display='flex';
+}
 function closeRecoveryModal(){
+  sessionStorage.removeItem('pendingRecoveryPin');
   document.getElementById('recoveryModal').style.display='none';
   unlockApp();
 }
