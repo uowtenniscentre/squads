@@ -1218,8 +1218,11 @@ async function completeSetup(){
     document.getElementById('recoveryCodeDisplay').textContent=pin;
     document.getElementById('recoveryModal').style.display='flex';
   }catch(e){
+    // Re-show setup screen in case it was hidden before the error occurred
+    document.getElementById('setupScreen').style.display='flex';
     err.textContent='Setup failed: '+e.message;
     btn.disabled=false;btn.textContent='Complete Setup';
+    toast('⚠️ Setup error — see form for details');
     console.error(e);
   }
 }
@@ -3298,7 +3301,25 @@ window.addEventListener('resize',checkOrientation);
 window.addEventListener('orientationchange',checkOrientation);
 checkOrientation();
 
-/* ── MONTHLY INCOME ── */
+/* ── PIN LOCK ON BACKGROUND/SCREEN LOCK ──
+   If the app has been hidden (screen locked, app swiped away) for longer than
+   PIN_LOCK_MS, encKey is cleared and PIN re-prompted when the app becomes visible again.
+   This protects shared tablets where a coach walks away without fully closing the app. */
+const PIN_LOCK_MS = 60 * 1000; // 60 seconds
+let _hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (encKey) _hiddenAt = Date.now(); // only start timer if session is active
+  } else if (document.visibilityState === 'visible') {
+    if (_hiddenAt && encKey && (Date.now() - _hiddenAt) >= PIN_LOCK_MS) {
+      // Clear key and names from memory — they will be restored after re-entering PIN
+      encKey = null;
+      D.children.forEach(c => { c.name = ''; c.playerID = ''; });
+      if (localStorage.getItem(NAMES_KEY)) showPinPrompt();
+    }
+    _hiddenAt = 0;
+  }
+}); */
 const INC_PRICE_KEY='stats_grp_prices'; // shared key with stats.html
 const INC_DEFAULT={development:35.50,'pre-performance':49.50,'u11-performance':49.50,'o11-performance':59.50};
 const GRP_COLORS={dev:'#38bdf8',prepf:'#c084fc',u11:'#4ade80',o11:'#facc15'};
