@@ -1210,8 +1210,9 @@ async function completeSetup(){
     const recBlob=await encryptJSON({pin},recKey);
     recBlob.salt=btoa(String.fromCharCode(...recSalt));
     localStorage.setItem(RECOVERY_KEY,JSON.stringify(recBlob));
-    // Migrate existing child data — extract names → encrypt → strip from ta_v10
-    if(D.children.length>0){await saveNames();saveD();}
+    // Always write ta_v10_names — ensures PIN prompt fires on next open even with zero children
+    await saveNames();
+    if(D.children.length>0){saveD();}
     // Show recovery code screen
     document.getElementById('setupScreen').style.display='none';
     document.getElementById('recoveryCodeDisplay').textContent=pin;
