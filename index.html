@@ -697,8 +697,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
 
           <div class="data-card">
             <div class="data-card-title">📥 Import Backup</div>
-            <div class="data-card-desc">Restore from a backup JSON. Squads and children updated; existing attendance kept.</div>
-            <button class="btn btn-outline btn-full" onclick="importJSON()">📥 Import Backup JSON</button>
+            <div class="data-card-desc">Restore from a backup file. Accepts encrypted <strong style="color:var(--accent)">.tenc</strong> files and plain <strong style="color:var(--muted)">.json</strong> files.</div>
+            <button class="btn btn-outline btn-full" onclick="importJSON()">📥 Import Backup</button>
           </div>
         </div>
 
@@ -711,14 +711,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
 
           <div class="data-card">
             <div class="data-card-title">⬇️ Archive Export (Excel)</div>
-            <div class="data-card-desc">Full attendance archive — one tab per group plus Summary and Coach Notes. Needs internet once to load Excel library.</div>
+            <div class="data-card-desc">Full attendance archive — one tab per group plus Summary and Coach Notes. Needs internet once to load Excel library. <strong style="color:var(--holiday)">⚠ Excel exports are always unencrypted</strong> — store the file securely.</div>
             <button class="btn btn-excel btn-full" onclick="exportExcel()">⬇ Download Archive Excel</button>
           </div>
 
           <div class="data-card">
             <div class="data-card-title">📤 Export Backup</div>
-            <div class="data-card-desc">Save all data as JSON. Use to transfer setup between devices or keep a safe backup.</div>
-            <button class="btn btn-outline btn-full" onclick="exportJSON()">📤 Export Backup JSON</button>
+            <div class="data-card-desc">Save all data as an encrypted <strong style="color:var(--accent)">.tenc</strong> file (when PIN is active) or plain <strong style="color:var(--muted)">.json</strong>. Use to transfer or keep a safe backup.</div>
+            <button class="btn btn-outline btn-full" onclick="exportJSON()">📤 Export Backup</button>
           </div>
 
           <div class="data-card" style="border-color:var(--accent-light)">
@@ -755,6 +755,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
 
       </div>
 
+      <!-- ── ENCRYPTION — full width below both columns ── -->
+      <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:18px">
+        <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">🔐 Encryption &amp; PIN</div>
+        <div class="data-card" id="encSection">Loading…</div>
+      </div>
+
       <!-- ── APP NOTES — full width below both columns ── -->
       <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:18px;padding-bottom:24px">
         <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">ℹ️ App Notes</div>
@@ -788,6 +794,108 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
     <div class="pw-btns">
       <button class="btn btn-ghost btn-sm" style="flex:1" onclick="cancelPw()">Cancel</button>
       <button class="btn btn-g btn-sm"     style="flex:1" onclick="submitPw()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN ENTRY SCREEN -->
+<div id="pinScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center">
+  <div class="pw-box" style="max-width:340px">
+    <div class="pw-icon">🎾</div>
+    <div class="pw-title">Junior Squads</div>
+    <div class="pw-sub">Enter your PIN to unlock</div>
+    <input class="pw-inp" type="password" id="pinInp" placeholder="PIN" maxlength="30" inputmode="numeric"
+           onkeydown="if(event.key==='Enter')submitPin()">
+    <div class="pw-err" id="pinErr"></div>
+    <div class="pw-btns">
+      <button class="btn btn-g btn-sm" style="flex:1" onclick="submitPin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIRST-TIME SETUP SCREEN -->
+<div id="setupScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;overflow-y:auto">
+  <div class="pw-box" style="max-width:400px;text-align:left;padding:28px">
+    <div style="text-align:center;margin-bottom:20px">
+      <div class="pw-icon">🔐</div>
+      <div class="pw-title">First-Time Setup</div>
+      <div class="pw-sub">Set your encryption PIN and admin password. Both are required to proceed.</div>
+    </div>
+    <div class="fg">
+      <label class="fl">Coaches PIN <span style="font-weight:400;color:var(--muted)">(all coaches enter this on app open)</span></label>
+      <input class="fi" type="password" id="setupPin" placeholder="e.g. 1234" maxlength="30" inputmode="numeric">
+    </div>
+    <div class="fg">
+      <label class="fl">Confirm PIN</label>
+      <input class="fi" type="password" id="setupPinConfirm" placeholder="Repeat PIN" maxlength="30" inputmode="numeric">
+    </div>
+    <div class="fg" style="margin-top:16px">
+      <label class="fl">Admin Password <span style="font-weight:400;color:var(--muted)">(admin use only)</span></label>
+      <input class="fi" type="password" id="setupAdminPw" placeholder="Min 6 characters" maxlength="50">
+    </div>
+    <div class="fg">
+      <label class="fl">Confirm Admin Password</label>
+      <input class="fi" type="password" id="setupAdminPwConfirm" placeholder="Repeat password" maxlength="50">
+    </div>
+    <div style="min-height:18px;font-size:.8rem;color:var(--absent);margin-bottom:10px" id="setupErr"></div>
+    <button class="btn btn-g btn-full" id="setupBtn" onclick="completeSetup()">Complete Setup</button>
+    <div style="margin-top:14px;padding:11px 13px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:9px;font-size:.74rem;color:var(--muted);line-height:1.6">
+      ⚠️ You will be shown a recovery code after setup. Write it down and store it safely — it is needed to recover access if the PIN is forgotten.
+    </div>
+  </div>
+</div>
+
+<!-- RECOVERY CODE MODAL -->
+<div id="recoveryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:600;align-items:center;justify-content:center">
+  <div class="pw-box" style="max-width:380px;text-align:left;padding:28px">
+    <div style="text-align:center;margin-bottom:18px">
+      <div class="pw-icon">✅</div>
+      <div class="pw-title">Setup Complete</div>
+      <div class="pw-sub">Write down your coaches PIN below and store it safely offline. This is the PIN all coaches use to unlock the app.</div>
+    </div>
+    <div style="background:#131a1f;border:2px solid rgba(34,197,94,.3);border-radius:12px;padding:18px;text-align:center;margin-bottom:18px">
+      <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Coaches PIN</div>
+      <div id="recoveryCodeDisplay" style="font-family:var(--mono);font-size:1.6rem;font-weight:700;color:#22c55e;letter-spacing:.1em"></div>
+    </div>
+    <button class="btn btn-outline btn-full btn-sm" style="margin-bottom:10px" onclick="exportSetupBackup()">⬇ Download plain backup now (recommended)</button>
+    <button class="btn btn-g btn-full" onclick="closeRecoveryModal()">I've written it down — Continue</button>
+  </div>
+</div>
+
+<!-- CHANGE PIN MODAL -->
+<div id="changePinModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center">
+  <div class="pw-box" style="max-width:360px;text-align:left;padding:28px">
+    <div class="pw-title">🔑 Change PIN</div>
+    <div class="pw-sub" style="margin-bottom:16px">Coaches will need to use the new PIN from next app open.</div>
+    <div class="fg"><label class="fl">Current PIN</label>
+      <input class="fi" type="password" id="cpCurrent" placeholder="Current PIN" maxlength="30" inputmode="numeric"></div>
+    <div class="fg"><label class="fl">New PIN</label>
+      <input class="fi" type="password" id="cpNew" placeholder="New PIN (min 4 chars)" maxlength="30" inputmode="numeric"></div>
+    <div class="fg"><label class="fl">Confirm New PIN</label>
+      <input class="fi" type="password" id="cpConfirm" placeholder="Repeat new PIN" maxlength="30" inputmode="numeric"></div>
+    <div style="min-height:18px;font-size:.8rem;color:var(--absent);margin-bottom:12px" id="cpErr"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="hideChangePinModal()">Cancel</button>
+      <button class="btn btn-g btn-sm" style="flex:1" onclick="submitChangePin()">Change PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE ADMIN PASSWORD MODAL -->
+<div id="changeAdminPwModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center">
+  <div class="pw-box" style="max-width:360px;text-align:left;padding:28px">
+    <div class="pw-title">🛡 Change Admin Password</div>
+    <div class="pw-sub" style="margin-bottom:16px">Only trusted admins should know this password.</div>
+    <div class="fg"><label class="fl">Current Password</label>
+      <input class="fi" type="password" id="capCurrent" placeholder="Current admin password" maxlength="50"></div>
+    <div class="fg"><label class="fl">New Password</label>
+      <input class="fi" type="password" id="capNew" placeholder="New password (min 6 chars)" maxlength="50"></div>
+    <div class="fg"><label class="fl">Confirm New Password</label>
+      <input class="fi" type="password" id="capConfirm" placeholder="Repeat new password" maxlength="50"></div>
+    <div style="min-height:18px;font-size:.8rem;color:var(--absent);margin-bottom:12px" id="capErr"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="hideChangeAdminPwModal()">Cancel</button>
+      <button class="btn btn-g btn-sm" style="flex:1" onclick="submitChangeAdminPw()">Change Password</button>
     </div>
   </div>
 </div>
@@ -919,7 +1027,13 @@ const GROUPS=[
 ];
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const PW='Tennis';
+/* ── SECURITY CONSTANTS ── */
+const PBKDF2_ITER=250000;
+const SALT_KEY='ta_enc_salt';
+const ADMIN_PW_KEY='ta_admin_pw';
+const NAMES_KEY='ta_v10_names';
+const RECOVERY_KEY='ta_recovery';
+let encKey=null; // AES-GCM CryptoKey — in memory only, never persisted
 
 /* ── DATA ── */
 let D={classes:[],children:[],attendance:{},activeWeeks:[],seasonYear:2025};
@@ -948,10 +1062,307 @@ function loadD(){
   else if(!D.activeWeeks||!D.activeWeeks.length)D.activeWeeks=[];
 }
 function saveD(){
-  try{localStorage.setItem('ta_v10',JSON.stringify(D));}
-  catch(e){toast('Storage full — export backup!');}
+  try{
+    const stripped={...D,children:D.children.map(c=>{
+      const {name,playerID,...rest}=c;
+      return rest;
+    })};
+    localStorage.setItem('ta_v10',JSON.stringify(stripped));
+  }catch(e){toast('Storage full — export backup!');}
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+/* ── CRYPTO UTILITIES ── */
+async function deriveKey(pin,salt){
+  const enc=new TextEncoder();
+  const km=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt,iterations:PBKDF2_ITER,hash:'SHA-256'},
+    km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']
+  );
+}
+async function encryptJSON(obj,key){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const enc=new TextEncoder();
+  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj)));
+  return{v:1,iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(cipher)))};
+}
+async function decryptJSON(envelope,key){
+  const iv=Uint8Array.from(atob(envelope.iv),c=>c.charCodeAt(0));
+  const data=Uint8Array.from(atob(envelope.data),c=>c.charCodeAt(0));
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+async function hashPassword(pw){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const enc=new TextEncoder();
+  const km=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:PBKDF2_ITER,hash:'SHA-256'},km,256);
+  return{salt:btoa(String.fromCharCode(...salt)),hash:btoa(String.fromCharCode(...new Uint8Array(bits)))};
+}
+async function verifyPassword(pw,stored){
+  const enc=new TextEncoder();
+  const salt=Uint8Array.from(atob(stored.salt),c=>c.charCodeAt(0));
+  const km=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:PBKDF2_ITER,hash:'SHA-256'},km,256);
+  return btoa(String.fromCharCode(...new Uint8Array(bits)))===stored.hash;
+}
+// Encrypt an object for export — embeds PBKDF2 salt so stats.html can re-derive key
+async function encryptForExport(obj){
+  if(!encKey)throw new Error('No active session — unlock app with PIN first');
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const enc=new TextEncoder();
+  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},encKey,enc.encode(JSON.stringify(obj)));
+  return{tenc:1,salt:localStorage.getItem(SALT_KEY),iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(cipher)))};
+}
+
+/* ── NAMES STORE ── */
+async function saveNames(){
+  if(!encKey)return;
+  const ns={};
+  D.children.forEach(c=>{ns[c.id]={name:c.name||'',playerID:c.playerID||''};});
+  try{
+    const envelope=await encryptJSON(ns,encKey);
+    localStorage.setItem(NAMES_KEY,JSON.stringify(envelope));
+  }catch(e){console.error('saveNames failed',e);}
+}
+async function loadNames(key){
+  const raw=localStorage.getItem(NAMES_KEY);
+  if(!raw)return;
+  const envelope=JSON.parse(raw);
+  const ns=await decryptJSON(envelope,key); // throws if key wrong
+  D.children.forEach(c=>{if(ns[c.id]){c.name=ns[c.id].name||'';c.playerID=ns[c.id].playerID||'';}});
+}
+
+/* ── SECURITY FLOW ── */
+async function checkSecurity(){
+  const hasPw=!!localStorage.getItem(ADMIN_PW_KEY);
+  const hasNames=!!localStorage.getItem(NAMES_KEY);
+  if(!hasPw){showFirstTimeSetup();return;}
+  if(hasNames){showPinPrompt();return;}
+  unlockApp();
+}
+function unlockApp(){
+  document.getElementById('pinScreen').style.display='none';
+  document.getElementById('setupScreen').style.display='none';
+  renderToday();
+  checkAutoBackup();
+}
+
+/* ── PIN PROMPT ── */
+function showPinPrompt(){
+  const el=document.getElementById('pinScreen');
+  el.style.display='flex';
+  document.getElementById('pinInp').value='';
+  document.getElementById('pinErr').textContent='';
+  setTimeout(()=>document.getElementById('pinInp').focus(),200);
+}
+async function submitPin(){
+  const pin=document.getElementById('pinInp').value.trim();
+  if(!pin){document.getElementById('pinErr').textContent='Please enter your PIN.';return;}
+  const saltB64=localStorage.getItem(SALT_KEY);
+  if(!saltB64){document.getElementById('pinErr').textContent='Setup incomplete — contact admin.';return;}
+  try{
+    const salt=Uint8Array.from(atob(saltB64),c=>c.charCodeAt(0));
+    const key=await deriveKey(pin,salt);
+    await loadNames(key); // throws DOMException if wrong key
+    encKey=key;
+    unlockApp();
+  }catch(e){
+    document.getElementById('pinErr').textContent='Incorrect PIN — try again.';
+    document.getElementById('pinInp').value='';
+    document.getElementById('pinInp').focus();
+  }
+}
+
+/* ── FIRST-TIME SETUP ── */
+function showFirstTimeSetup(){
+  document.getElementById('setupScreen').style.display='flex';
+  setTimeout(()=>document.getElementById('setupPin').focus(),200);
+}
+async function completeSetup(){
+  const pin=document.getElementById('setupPin').value;
+  const pinC=document.getElementById('setupPinConfirm').value;
+  const adminPw=document.getElementById('setupAdminPw').value;
+  const adminPwC=document.getElementById('setupAdminPwConfirm').value;
+  const err=document.getElementById('setupErr');
+  err.textContent='';
+  if(pin.length<4){err.textContent='PIN must be at least 4 characters.';return;}
+  if(pin!==pinC){err.textContent='PINs do not match.';return;}
+  if(adminPw.length<6){err.textContent='Admin password must be at least 6 characters.';return;}
+  if(adminPw!==adminPwC){err.textContent='Admin passwords do not match.';return;}
+  const btn=document.getElementById('setupBtn');
+  btn.disabled=true;btn.textContent='Setting up…';
+  try{
+    // Hash admin password
+    const adminHash=await hashPassword(adminPw);
+    localStorage.setItem(ADMIN_PW_KEY,JSON.stringify(adminHash));
+    // Generate PBKDF2 salt + derive encryption key
+    const salt=crypto.getRandomValues(new Uint8Array(16));
+    const saltB64=btoa(String.fromCharCode(...salt));
+    localStorage.setItem(SALT_KEY,saltB64);
+    const key=await deriveKey(pin,salt);
+    encKey=key;
+    // Encrypt recovery (PIN) under admin password, with its own salt
+    const recSalt=crypto.getRandomValues(new Uint8Array(16));
+    const recKey=await deriveKey(adminPw,recSalt);
+    const recBlob=await encryptJSON({pin},recKey);
+    recBlob.salt=btoa(String.fromCharCode(...recSalt));
+    localStorage.setItem(RECOVERY_KEY,JSON.stringify(recBlob));
+    // Migrate existing child data — extract names → encrypt → strip from ta_v10
+    if(D.children.length>0){await saveNames();saveD();}
+    // Show recovery code screen
+    document.getElementById('setupScreen').style.display='none';
+    document.getElementById('recoveryCodeDisplay').textContent=pin;
+    document.getElementById('recoveryModal').style.display='flex';
+  }catch(e){
+    err.textContent='Setup failed: '+e.message;
+    btn.disabled=false;btn.textContent='Complete Setup';
+    console.error(e);
+  }
+}
+function closeRecoveryModal(){
+  document.getElementById('recoveryModal').style.display='none';
+  unlockApp();
+}
+async function exportSetupBackup(){
+  // Plain JSON backup before encryption is fully relied upon
+  const a=document.createElement('a');
+  const backup={...D,_exportedAt:new Date().toISOString()};
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
+  a.download=`tennis-backup-SETUP-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();URL.revokeObjectURL(a.href);toast('Plain backup downloaded — store safely ✓');
+}
+
+/* ── CHANGE PIN / ADMIN PW ── */
+function showChangePinModal(){
+  document.getElementById('changePinModal').style.display='flex';
+  document.getElementById('cpCurrent').value='';
+  document.getElementById('cpNew').value='';
+  document.getElementById('cpConfirm').value='';
+  document.getElementById('cpErr').textContent='';
+}
+function hideChangePinModal(){document.getElementById('changePinModal').style.display='none';}
+async function submitChangePin(){
+  const cur=document.getElementById('cpCurrent').value.trim();
+  const nw=document.getElementById('cpNew').value.trim();
+  const cf=document.getElementById('cpConfirm').value.trim();
+  const err=document.getElementById('cpErr');
+  err.textContent='';
+  if(!cur||!nw){err.textContent='All fields required.';return;}
+  if(nw.length<4){err.textContent='New PIN must be at least 4 characters.';return;}
+  if(nw!==cf){err.textContent='New PINs do not match.';return;}
+  // Verify current PIN by trying to decrypt names
+  const saltB64=localStorage.getItem(SALT_KEY);
+  if(!saltB64){err.textContent='No salt found — contact admin.';return;}
+  try{
+    const salt=Uint8Array.from(atob(saltB64),c=>c.charCodeAt(0));
+    const testKey=await deriveKey(cur,salt);
+    if(localStorage.getItem(NAMES_KEY))await loadNames(testKey); // throws if wrong
+  }catch(e){err.textContent='Current PIN is incorrect.';return;}
+  // Generate new salt + new key + re-encrypt names
+  try{
+    err.textContent='Re-encrypting…';
+    const newSalt=crypto.getRandomValues(new Uint8Array(16));
+    const newSaltB64=btoa(String.fromCharCode(...newSalt));
+    const newKey=await deriveKey(nw,newSalt);
+    encKey=newKey;
+    localStorage.setItem(SALT_KEY,newSaltB64);
+    if(D.children.length>0)await saveNames();
+    // Re-encrypt recovery blob under same admin password (need to know it... use existing stored hash)
+    // We can't re-derive the admin key without the admin password, so we just note the recovery code is now stale
+    // Admin should use "View Recovery Code" (which will fail) and set new via Change PIN flow
+    localStorage.removeItem(RECOVERY_KEY); // stale — admin must note new PIN
+    hideChangePinModal();
+    toast('PIN changed ✓ — Note: recovery code cleared. View/reset it via Change Admin Password.');
+    renderAdData();
+  }catch(e){err.textContent='Failed: '+e.message;}
+}
+function showChangeAdminPwModal(){
+  document.getElementById('changeAdminPwModal').style.display='flex';
+  document.getElementById('capCurrent').value='';
+  document.getElementById('capNew').value='';
+  document.getElementById('capConfirm').value='';
+  document.getElementById('capErr').textContent='';
+}
+function hideChangeAdminPwModal(){document.getElementById('changeAdminPwModal').style.display='none';}
+async function submitChangeAdminPw(){
+  const cur=document.getElementById('capCurrent').value;
+  const nw=document.getElementById('capNew').value;
+  const cf=document.getElementById('capConfirm').value;
+  const err=document.getElementById('capErr');
+  err.textContent='';
+  if(!cur||!nw){err.textContent='All fields required.';return;}
+  if(nw.length<6){err.textContent='New password must be at least 6 characters.';return;}
+  if(nw!==cf){err.textContent='Passwords do not match.';return;}
+  const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
+  if(!stored){err.textContent='No admin password set.';return;}
+  const ok=await verifyPassword(cur,stored);
+  if(!ok){err.textContent='Current password is incorrect.';return;}
+  try{
+    err.textContent='Updating…';
+    const newHash=await hashPassword(nw);
+    localStorage.setItem(ADMIN_PW_KEY,JSON.stringify(newHash));
+    // Re-encrypt recovery blob (contains the PIN) under new admin password
+    const curSaltB64=localStorage.getItem(SALT_KEY);
+    if(curSaltB64&&encKey){
+      // Re-derive recovery using new admin pw
+      const recSalt=crypto.getRandomValues(new Uint8Array(16));
+      const recKey=await deriveKey(nw,recSalt);
+      // We need the current PIN — but we can only get it if recovery exists
+      // Instead, encrypt a placeholder noting PIN is unknown
+      // Best practice: ask user for the PIN here
+      const pinVal=prompt('Enter the current coaches PIN to update recovery record (needed to keep recovery working):');
+      if(pinVal){
+        const recBlob=await encryptJSON({pin:pinVal},recKey);
+        recBlob.salt=btoa(String.fromCharCode(...recSalt));
+        localStorage.setItem(RECOVERY_KEY,JSON.stringify(recBlob));
+      }else{
+        localStorage.removeItem(RECOVERY_KEY);
+      }
+    }
+    hideChangeAdminPwModal();
+    toast('Admin password changed ✓');
+    renderAdData();
+  }catch(e){err.textContent='Failed: '+e.message;}
+}
+async function viewRecoveryCode(){
+  const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
+  if(!stored){toast('No admin password set');return;}
+  const pw=prompt('Enter admin password to view recovery code:');
+  if(!pw)return;
+  const ok=await verifyPassword(pw,stored);
+  if(!ok){toast('Incorrect admin password');return;}
+  const recRaw=localStorage.getItem(RECOVERY_KEY);
+  if(!recRaw){toast('No recovery record — set a new one via Change PIN.');return;}
+  try{
+    const recBlob=JSON.parse(recRaw);
+    const recSalt=Uint8Array.from(atob(recBlob.salt),c=>c.charCodeAt(0));
+    const recKey=await deriveKey(pw,recSalt);
+    const data=await decryptJSON(recBlob,recKey);
+    alert(`Recovery PIN: ${data.pin}\n\nThis is the coaches PIN. Store it safely offline.`);
+  }catch(e){toast('Could not decrypt recovery — it may be from a different admin password.');}
+}
+function renderAdData(){
+  // Render encryption status section
+  const encEl=document.getElementById('encSection');
+  if(!encEl)return;
+  const active=!!localStorage.getItem(NAMES_KEY);
+  encEl.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border-radius:20px;font-size:.83rem;font-weight:800;${active?'background:rgba(34,197,94,.12);color:#22c55e;border:1.5px solid rgba(34,197,94,.35)':'background:rgba(248,113,113,.1);color:#f87171;border:1.5px solid rgba(248,113,113,.3)'}">
+        ${active?'✓ Encryption active':'⚠ Encryption not active'}
+      </span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="showChangePinModal()">🔑 Change PIN</button>
+      <button class="btn btn-ghost btn-sm" onclick="showChangeAdminPwModal()">🛡 Change Admin Password</button>
+      <button class="btn btn-ghost btn-sm" onclick="viewRecoveryCode()">👁 View Recovery Code</button>
+    </div>
+    ${active?'<div style="margin-top:12px;padding:10px 13px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:9px;font-size:.75rem;color:var(--muted);line-height:1.6">⚠️ If the PIN is forgotten and only <strong style="color:var(--text)">.tenc</strong> backups exist, those backups are unrecoverable without the PIN. Keep a plain .json backup and your recovery code stored safely offline.</div>':''}`;
+  renderAutoBackupCard();
+}
 
 /* ── WEEK UTILS ── */
 function toWK(d){
@@ -999,14 +1410,18 @@ function initWeeks(){D.activeWeeks=seasonWks(D.seasonYear||2025);saveD();}
 /* ── PASSWORD ── */
 // pwScreen uses plain display style — no class toggling
 function openPw(){
+  if(!localStorage.getItem(ADMIN_PW_KEY)){showFirstTimeSetup();return;}
   document.getElementById('pwInp').value='';
   document.getElementById('pwErr').textContent='';
   document.getElementById('pwScreen').style.display='flex';
   setTimeout(()=>document.getElementById('pwInp').focus(),200);
 }
-function submitPw(){
+async function submitPw(){
   const v=document.getElementById('pwInp').value;
-  if(v===PW){
+  const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
+  if(!stored){document.getElementById('pwErr').textContent='No admin password set.';return;}
+  const ok=await verifyPassword(v,stored);
+  if(ok){
     document.getElementById('pwScreen').style.display='none';
     openAdmin();
   }else{
@@ -1057,7 +1472,7 @@ function goAdmin(p){
   }
   if(p==='holidays') renderCal();
   if(p==='income')   renderAdIncome();
-  if(p==='data')     renderAutoBackupCard();
+  if(p==='data')     {renderAutoBackupCard();renderAdData();}
 }
 
 /* ── COACH SCREEN ROUTING ── */
@@ -1154,7 +1569,7 @@ function renderToday(){
         <span class="grp-name" style="font-size:.72rem;text-transform:uppercase;letter-spacing:1.2px;font-weight:700">${g.label}</span>
       </div>`;
     gc.forEach(c=>{
-      const n=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).length;
+      const n=D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id)).length;
       const att=D.attendance[`${c.id}_${wk}`];
       const done=att&&Object.keys(att.records||{}).length>0;
        const nP=att?Object.values(att.records||{}).filter(v=>v==='present').length:0;
@@ -1170,7 +1585,7 @@ function renderToday(){
            :'<span style="background:#221616;color:#f87171;border:1.5px solid #6b1f1f;border-radius:20px;padding:5px 16px;font-size:1.05rem;font-weight:800;flex-shrink:0">Pending</span>';
        html+=`<div class="cls-card" onclick="openAttFromToday('${c.id}')">
          <div style="flex:1">
-           <div class="cls-name">${c.name}</div>
+           <div class="cls-name">${escapeHtml(c.name)}</div>
            <div class="cls-meta">👤 ${c.coach} · ${n} player${n!==1?'s':''}</div>
          </div>
          ${badge}
@@ -1296,7 +1711,7 @@ function renderOverview(){
     filtered.forEach(n=>{
       h+=`<div style="background:${n.bg};border:1.5px solid ${n.br};border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:16px">
         <div style="flex:1">
-          <div style="font-size:1.5rem;font-weight:700;color:var(--text)">${n.player} <span style="font-size:.85rem;font-weight:500;color:var(--muted)">b. ${n.birthYear}</span></div>
+          <div style="font-size:1.5rem;font-weight:700;color:var(--text)">${escapeHtml(n.player)} <span style="font-size:.85rem;font-weight:500;color:var(--muted)">b. ${n.birthYear}</span></div>
           <div style="font-size:.82rem;color:var(--muted);margin-top:3px">${n.squad}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -1341,9 +1756,9 @@ function renderGroups(){
       </div>
       <div class="grp-body open" id="gb-${g.id}">`;
     cls.forEach(c=>{
-      const n=D.children.filter(ch=>(ch.classIds||[ch.classId]).includes(c.id)).length;
+      const n=D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id)).length;
       html+=`<div class="cls-card" onclick="openAtt('${c.id}')">
-        <div><div class="cls-name">${c.name}</div>
+        <div><div class="cls-name">${escapeHtml(c.name)}</div>
         <div class="cls-meta"><strong>${c.coach}</strong> · ${c.day} · ${n} player${n!==1?'s':''}</div></div>
         <div class="cls-badge">${n}</div></div>`;
     });
@@ -1493,8 +1908,6 @@ function renderAttBody(){
   const kids=D.children.filter(c=>(c.classIds||[c.classId]).includes(selCls));
   const isHol=!D.activeWeeks.includes(selWk);
   const aKey=`${selCls}_${selWk}`;
-  if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
-  const att=D.attendance[aKey];
   if(isHol){
     body.innerHTML=`<div class="hol-banner">
       <div style="font-size:2rem;margin-bottom:8px">🏖️</div>
@@ -1504,6 +1917,8 @@ function renderAttBody(){
     </div>`;
     return;
   }
+  if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
+  const att=D.attendance[aKey];
   if(!kids.length){
     body.innerHTML='<div class="empty"><div class="ico">👦</div><p>No players in this squad.<br>Add them in <strong>Admin</strong>.</p></div>';
     return;
@@ -1574,7 +1989,7 @@ function renderAttBody(){
     row.innerHTML=`
       <div class="s-info">
         <div class="s-gender">${genderIcon}</div>
-        <div><div><span class="s-name">${s.name}</span>${yrStr}</div>${idLine}</div>
+        <div><div><span class="s-name">${escapeHtml(s.name)}</span>${yrStr}</div>${idLine}</div>
       </div>
       <div class="att-btns">
         <div style="width:1px;height:24px;background:rgba(164,153,244,0.2);flex-shrink:0"></div>
@@ -1713,7 +2128,6 @@ function renderCal(){
   });
   const cnt=swks.filter(w=>D.activeWeeks.includes(w)).length;
   document.getElementById('activeCnt').textContent=`${cnt} active coaching weeks`;
-  saveD();
 }
 function changeSeason(){
   const y=parseInt(document.getElementById('sy').value)||2025;
@@ -1778,7 +2192,7 @@ function renderAdCls(){
     const n=D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id)).length;
     const canArchive=n===0;
     return`<div class="ai">
-      <div><div class="ai-name">${c.name} <span class="gbadge ${g.css}">${g.label}</span></div>
+      <div><div class="ai-name">${escapeHtml(c.name)} <span class="gbadge ${g.css}">${g.label}</span></div>
       <div class="ai-sub">${c.day} · ${c.coach} · ${n} player${n!==1?'s':''}</div></div>
       <div class="ai-acts">
         <button class="btn btn-xs btn-outline" onclick="viewSquadPlayers('${c.id}')" title="View players & manage leaves">Players</button>
@@ -1799,7 +2213,7 @@ function renderAdCls(){
       const weekStr=c.archivedAt?` · archived ${wkLbl(c.archivedAt)}`:'';
       const attCount=Object.keys(D.attendance).filter(k=>k.startsWith(c.id+'_')).length;
       return`<div class="ai" style="opacity:.7;border-left:3px solid var(--muted)">
-        <div><div class="ai-name">${c.name} <span class="gbadge ${g.css}">${g.label}</span> <span style="font-size:.68rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px">archived</span></div>
+        <div><div class="ai-name">${escapeHtml(c.name)} <span class="gbadge ${g.css}">${g.label}</span> <span style="font-size:.68rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px">archived</span></div>
         <div class="ai-sub">${c.day} · ${c.coach}${weekStr} · ${attCount} week${attCount!==1?'s':''} of data</div></div>
         <div class="ai-acts">
           <button class="btn btn-xs btn-outline" onclick="unarchiveCls('${c.id}')">Restore</button>
@@ -1814,14 +2228,14 @@ function renderAdCls(){
 function populateChFil(){
   const sel=document.getElementById('adChClsFil');
   sel.innerHTML='<option value="">All squads</option>';
-  D.classes.filter(c=>!c.archived).forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+  D.classes.filter(c=>!c.archived).forEach(c=>sel.innerHTML+=`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
 }
 function syncChFil(){
   const grp=document.getElementById('adChGrpFil').value;
   const sel=document.getElementById('adChClsFil');
   const cls=grp?D.classes.filter(c=>!c.archived&&c.group===grp):D.classes.filter(c=>!c.archived);
   sel.innerHTML='<option value="">All squads</option>';
-  cls.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+  cls.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
   renderAdCh();
 }
 function toggleLeavers(){
@@ -1866,7 +2280,7 @@ function renderAdCh(){
       const badges=cids.map(cid=>{const cls=D.classes.find(c=>c.id===cid);const g=cls?GROUPS.find(g=>g.id===cls.group):null;return cls&&g?`<span class="gbadge ${g.css}">${cls.name}</span>`:''}).join(' ');
       const pidStr=ch.playerID?` · ID: ${ch.playerID}`:'';
       return`<div class="ai">
-        <div><div class="ai-name">${ch.name} ${badges}</div>
+        <div><div class="ai-name">${escapeHtml(ch.name)} ${badges}</div>
         <div class="ai-sub">b. ${ch.birthYear}${pidStr}</div></div>
         <div class="ai-acts">
           <button class="btn btn-xs btn-outline" onclick="editCh('${ch.id}')">Edit</button>
@@ -1899,7 +2313,7 @@ function renderLeavers(){
       const reasonStr=ch.archivedReason?` · ${ch.archivedReason}`:'';
       return`<div class="ai" style="opacity:.85;border-left:3px solid #f87171">
         <div style="flex:1;min-width:0">
-          <div class="ai-name" style="color:var(--text)">${ch.name} <span style="font-size:.68rem;font-weight:600;color:#f87171;background:rgba(248,113,113,.12);padding:2px 6px;border-radius:4px">left programme</span></div>
+          <div class="ai-name" style="color:var(--text)">${escapeHtml(ch.name)} <span style="font-size:.68rem;font-weight:600;color:#f87171;background:rgba(248,113,113,.12);padding:2px 6px;border-radius:4px">left programme</span></div>
           <div class="ai-sub">b. ${ch.birthYear}${fromIds.length?' · was in: '+squadNames.join(', '):''}</div>
           <div class="ai-sub" style="font-family:var(--mono);font-size:.7rem;margin-top:2px">${weekStr}${reasonStr}</div>
           <div class="ai-sub" style="color:${pctCol};font-size:.72rem;margin-top:2px">${pctStr}</div>
@@ -1924,7 +2338,7 @@ function renderLeavers(){
       const curNames=curIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?c.name:null;}).filter(Boolean).join(', ');
       return`<div class="ai" style="opacity:.9;border-left:3px solid #fbbf24">
         <div style="flex:1;min-width:0">
-          <div class="ai-name" style="color:var(--text)">${ch.name} <span style="font-size:.68rem;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.12);padding:2px 6px;border-radius:4px">still active</span></div>
+          <div class="ai-name" style="color:var(--text)">${escapeHtml(ch.name)} <span style="font-size:.68rem;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.12);padding:2px 6px;border-radius:4px">still active</span></div>
           <div class="ai-sub">Now in: ${curNames||'—'}</div>
           ${leaveItems}
         </div>
@@ -2019,7 +2433,7 @@ function openArchiveMod(id){
   document.getElementById('archiveConfirmBtn').textContent=cids.length<=1?'Confirm Leave':'Confirm Leave';
   openMod('mArchive');
 }
-function confirmArchive(){
+async function confirmArchive(){
   const id=document.getElementById('archiveChildId').value;
   const week=document.getElementById('archiveWeek').value.trim()||toWK(new Date());
   const reasonSel=document.getElementById('archiveReason').value;
@@ -2044,7 +2458,7 @@ function confirmArchive(){
     const leavingNames=leavingIds.map(cid=>{const c=D.classes.find(x=>x.id===cid);return c?c.name:'?';}).join(', ');
     toast(`${ch.name} removed from ${leavingNames} ✓`);
   }
-  saveD();
+  saveD();if(encKey)await saveNames();
 }
 function restoreChild(id){
   const ch=D.children.find(c=>c.id===id);if(!ch)return;
@@ -2127,7 +2541,7 @@ function viewSquadPlayers(id){
   } else {
     el.innerHTML=players.sort((a,b)=>a.name.localeCompare(b.name)).map(ch=>{
       return`<div class="ai" style="margin-bottom:6px">
-        <div><div class="ai-name">${ch.name}</div>
+        <div><div class="ai-name">${escapeHtml(ch.name)}</div>
         <div class="ai-sub">b. ${ch.birthYear}${ch.playerID?' · ID: '+ch.playerID:''}</div></div>
         <div class="ai-acts">
           <button class="btn btn-xs" style="background:#92400e;color:#fff;border-radius:8px;border:none;padding:6px 10px;cursor:pointer;font-size:.72rem;font-weight:700"
@@ -2202,7 +2616,7 @@ function editCh(id){
   else{addChClsRow();}
   openMod('mCh');
 }
-function saveCh(){
+async function saveCh(){
   const name=document.getElementById('ch_name').value.trim();
   const yr=parseInt(document.getElementById('ch_yr').value);
   const pid=document.getElementById('ch_pid').value.trim();
@@ -2220,13 +2634,13 @@ function saveCh(){
   } else {
     D.children.push({id:uid(),...obj});
   }
-  saveD();closeMod('mCh');renderAdCh();toast('Child saved ✓');
+  saveD();if(encKey)await saveNames();closeMod('mCh');renderAdCh();toast('Child saved ✓');
 }
-function delCh(id){
+async function delCh(id){
   const ch=D.children.find(c=>c.id===id);
   if(!confirm(`Permanently delete ${ch?.name||'this child'} and ALL their attendance history? This cannot be undone.`))return;
   D.children=D.children.filter(c=>c.id!==id);
-  saveD();renderAdCh();toast('Permanently deleted');
+  saveD();if(encKey)await saveNames();renderAdCh();toast('Permanently deleted');
 }
 
 /* ── AUTO BACKUP ── */
@@ -2246,23 +2660,31 @@ function saveAutoBackupDay(){
   toast('Backup day saved ✓');
 }
 
-function runAutoBackup(manual=false){
+async function runAutoBackup(manual=false){
   const today=new Date().toISOString().split('T')[0];
-  const filename=`squads-backup-${today}.json`;
-  const a=document.createElement('a');
   const backup={...D,_exportedAt:new Date().toISOString()};
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
-  a.download=filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  // Record that backup ran today
+  const a=document.createElement('a');
+  if(encKey){
+    try{
+      const envelope=await encryptForExport(backup);
+      a.href=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/octet-stream'}));
+      a.download=`squads-backup-${today}.tenc`;
+    }catch(e){
+      // Fall back to plain JSON if encryption fails
+      a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
+      a.download=`squads-backup-${today}.json`;
+    }
+  }else{
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
+    a.download=`squads-backup-${today}.json`;
+  }
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
   const s=abSettings();s.lastRun=today;saveAbSettings(s);
   if(manual){
     toast('Backup saved to Downloads ✓');
     renderAutoBackupCard();
-  } else {
-    // Subtle toast for auto-run — doesn't interrupt coaching
+  }else{
     setTimeout(()=>toast('📦 Weekly backup saved to Downloads ✓'),1200);
   }
 }
@@ -2305,49 +2727,75 @@ function renderAutoBackupCard(){
 }
 
 /* ── BACKUP / RESTORE ── */
-function exportJSON(){
-  const a=document.createElement('a');
+async function exportJSON(){
   const backup={...D,_exportedAt:new Date().toISOString()};
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
-  a.download=`tennis-backup-${new Date().toISOString().split('T')[0]}.json`;
-  a.click();toast('Backup downloaded ✓');
+  const dateStr=new Date().toISOString().split('T')[0];
+  if(encKey){
+    try{
+      const envelope=await encryptForExport(backup);
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/octet-stream'}));
+      a.download=`tennis-backup-${dateStr}.tenc`;
+      a.click();URL.revokeObjectURL(a.href);toast('Encrypted backup downloaded ✓');
+    }catch(e){toast('Encrypt failed: '+e.message);}
+  }else{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
+    a.download=`tennis-backup-${dateStr}.json`;
+    a.click();URL.revokeObjectURL(a.href);toast('Backup downloaded (unencrypted — unlock with PIN for encrypted backups) ✓');
+  }
 }
 function importJSON(){
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json,.tenc';
   inp.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const isTenc=f.name.endsWith('.tenc');
     const r=new FileReader();
-    r.onload=ev=>{
+    r.onload=async ev=>{
       try{
-        const p=JSON.parse(ev.target.result);
-        // Validate it looks like a real backup
+        let p;
+        if(isTenc){
+          const envelope=JSON.parse(ev.target.result);
+          if(!envelope.tenc){toast('Not a valid .tenc file');return;}
+          if(!encKey){toast('No active PIN session — restart app and enter PIN first');return;}
+          try{p=await decryptJSON(envelope,encKey);}
+          catch(e){toast('Decryption failed — wrong PIN or corrupted file');return;}
+        }else{
+          p=JSON.parse(ev.target.result);
+        }
         if(!p.classes||!p.children||!p.attendance){toast('Invalid backup file — missing data');return;}
         const squadCount=p.classes?.length||0;
         const childCount=p.children?.length||0;
         const backupDate=p._exportedAt?new Date(p._exportedAt).toLocaleString('en-GB'):'unknown date';
         if(!confirm(`⚠️ RESTORE FROM BACKUP\n\nThis will completely replace ALL current app data with this backup:\n• ${squadCount} squad${squadCount!==1?'s':''}\n• ${childCount} player${childCount!==1?'s':''}\n• Backed up: ${backupDate}\n\nAll current squads, players and attendance records will be lost.\n\nContinue?`))return;
         if(!confirm('Last confirmation — this cannot be undone.\n\nReplace everything with the backup?'))return;
-        // Full overwrite — exactly what was backed up is restored
         D=p;
+        delete D._exportedAt;
         saveD();
+        if(encKey)await saveNames(); // re-encrypt names from restored data
         renderAdCls();renderAdCh();renderGroups();renderToday();
         toast('Backup restored ✓ — all data replaced');
       }catch{toast('Invalid file — could not parse backup');}
     };
-    r.readAsText(e.target.files[0]);
+    r.readAsText(f);
   };
   inp.click();
 }
-function nukeAll(){
+async function nukeAll(){
+  const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
+  if(!stored){toast('No admin password set — cannot delete');return;}
   const entered=prompt('Enter admin password to delete all data:');
-  if(entered===null)return; // cancelled
-  if(entered!==PW){toast('Incorrect password — data not deleted');return;}
+  if(entered===null)return;
+  const ok=await verifyPassword(entered,stored);
+  if(!ok){toast('Incorrect password — data not deleted');return;}
   if(!confirm('Delete ALL data permanently? Squads, children and all attendance records will be lost.'))return;
   if(!confirm('Last chance — this cannot be undone. Delete everything?'))return;
-  localStorage.removeItem('ta_v10');location.reload();
+  [NAMES_KEY,SALT_KEY,RECOVERY_KEY,'ta_v10'].forEach(k=>localStorage.removeItem(k));
+  location.reload();
 }
 
 /* ── STATS JSON EXPORT ── */
-function exportStatsJSON(){
+async function exportStatsJSON(){
   if(!D.classes.length){toast('No data to export');return;}
   const aws=seasonWks(D.seasonYear).filter(w=>D.activeWeeks.includes(w));
   if(!aws.length){toast('No active weeks — check Holidays tab');return;}
@@ -2408,11 +2856,20 @@ function exportStatsJSON(){
     leavers
   };
 
+  const dateStr=new Date().toISOString().split('T')[0];
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
-  a.download='squads-stats-'+D.seasonYear+'-'+new Date().toISOString().split('T')[0]+'.json';
-  a.click();
-  toast('Stats JSON exported ✓');
+  if(encKey){
+    try{
+      const envelope=await encryptForExport(payload);
+      a.href=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/octet-stream'}));
+      a.download='squads-stats-'+D.seasonYear+'-'+dateStr+'.tenc';
+      a.click();URL.revokeObjectURL(a.href);toast('Stats exported (encrypted) ✓');
+    }catch(e){toast('Encrypt failed: '+e.message);}
+  }else{
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+    a.download='squads-stats-'+D.seasonYear+'-'+dateStr+'.json';
+    a.click();URL.revokeObjectURL(a.href);toast('Stats JSON exported ✓');
+  }
 }
 
 /* ── EXCEL ── */
@@ -2432,9 +2889,6 @@ function exportExcel(){
 
   // Helper: apply a solid fill + bold to a cell
   function hdrStyle(rgb){
-    return{font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
-  }
-  function subHdrStyle(rgb){
     return{font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb}},alignment:{horizontal:'center',vertical:'center',wrapText:true}};
   }
   function squadTitleStyle(rgb){
@@ -2795,7 +3249,7 @@ function importPlayersXlsx(){
           D.children.push(child);
           added++;
         });
-        saveD();renderAdCh();
+        saveD();if(encKey)saveNames();renderAdCh();
         toast(`Players imported: ${added} added, ${skipped} skipped ✓`);
       }catch(err){toast('Error reading file: '+err.message);}
     };
@@ -2818,14 +3272,12 @@ function toast(msg){
 
 /* ── INIT ── */
 loadD();
-// hdrDate removed — replaced by logo
 // silently pre-load SheetJS
 const _x=document.createElement('script');
 _x.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 document.head.appendChild(_x);
-renderToday();
-// Check if weekly auto-backup should run today
-checkAutoBackup();
+// Security gate — calls unlockApp() (which calls renderToday + checkAutoBackup) once PIN accepted
+checkSecurity();
 // Orientation lock — try API first, then fall back to manual overlay
 function checkOrientation(){
   const prompt=document.getElementById('rotatePrompt');

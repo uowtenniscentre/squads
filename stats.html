@@ -360,9 +360,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div id="dropZone">
   <div class="drop-icon">📊</div>
   <div class="drop-title">Attendance Statistics</div>
-  <div class="drop-sub">Load a stats JSON exported from the Junior Squads Attendance app to view charts, squad comparisons, player heatmaps and leaver analysis.</div>
+  <div class="drop-sub">Load a stats file exported from the Junior Squads Attendance app. Accepts encrypted <strong style="color:#A499F4">.tenc</strong> files (you'll be prompted for your PIN) and plain <strong>.json</strong> files.</div>
   <button class="drop-btn" onclick="triggerLoad()">📂 Choose File</button>
-  <div class="drop-hint">or drag & drop the .json file anywhere on this page</div>
+  <div class="drop-hint">or drag & drop a .tenc or .json file anywhere on this page</div>
 </div>
 
 <div id="dashboard">
@@ -446,7 +446,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 
 <div class="toast" id="toast"></div>
-<input type="file" id="fileInput" accept=".json" style="display:none">
+<input type="file" id="fileInput" accept=".json,.tenc" style="display:none">
+
+<!-- PRICE SETTINGS MODAL -->
+<div class="price-modal-bg" id="priceModalBg">
+  <div class="price-modal">
+    <h3>💰 Monthly Prices per Group</h3>
+    <p>Set the monthly subscription fee for each programme group. These prices are used to calculate income statistics.</p>
+    <div id="priceRows"></div>
+    <div class="price-modal-footer">
+      <button class="pm-btn cancel" onclick="closePriceModal()">Cancel</button>
+      <button class="pm-btn save" onclick="savePrices()">Save Prices</button>
+    </div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -490,18 +503,54 @@ document.body.addEventListener('dragleave',e=>{if(!e.relatedTarget||e.relatedTar
 document.body.addEventListener('drop',e=>{
   e.preventDefault();document.getElementById('dropZone').classList.remove('drag-over');
   const f=e.dataTransfer.files[0];
-  if(f&&f.name.endsWith('.json'))readFile(f);else toast('Please drop a .json stats file');
+  if(f&&(f.name.endsWith('.json')||f.name.endsWith('.tenc')))readFile(f);else toast('Please drop a .json or .tenc stats file');
 });
 
-function readFile(f){
+/* ── CRYPTO (stats.html — for .tenc import) ── */
+const PBKDF2_ITER=250000;
+async function deriveKey(pin,salt){
+  const enc=new TextEncoder();
+  const km=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt,iterations:PBKDF2_ITER,hash:'SHA-256'},
+    km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']
+  );
+}
+async function decryptEnvelope(envelope,pin){
+  const salt=Uint8Array.from(atob(envelope.salt),c=>c.charCodeAt(0));
+  const iv=Uint8Array.from(atob(envelope.iv),c=>c.charCodeAt(0));
+  const data=Uint8Array.from(atob(envelope.data),c=>c.charCodeAt(0));
+  const key=await deriveKey(pin,salt);
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+async function readFile(f){
+  const isTenc=f.name.endsWith('.tenc');
   const r=new FileReader();
-  r.onload=ev=>{
+  r.onload=async ev=>{
     try{
-      const d=JSON.parse(ev.target.result);
-      if(!d.squads||!d.weeks)throw new Error('Not a valid stats export');
-      SD=d;
-      try{sessionStorage.setItem('stats_sd',ev.target.result);}catch(e){}
-      showDashboard();
+      if(isTenc){
+        const envelope=JSON.parse(ev.target.result);
+        if(!envelope.tenc){toast('Not a valid .tenc file');return;}
+        // Show PIN prompt
+        const pin=prompt('This is an encrypted stats file.\nEnter the coaches PIN to decrypt:');
+        if(pin===null)return;
+        if(!pin){toast('PIN required to open encrypted file');return;}
+        let d;
+        try{d=await decryptEnvelope(envelope,pin);}
+        catch(e){toast('Decryption failed — incorrect PIN or corrupted file');return;}
+        if(!d.squads||!d.weeks){toast('Decrypted file is not a valid stats export');return;}
+        SD=d;
+        try{sessionStorage.setItem('stats_sd',JSON.stringify(d));}catch(e){}
+        showDashboard();
+      }else{
+        const d=JSON.parse(ev.target.result);
+        if(!d.squads||!d.weeks)throw new Error('Not a valid stats export');
+        SD=d;
+        try{sessionStorage.setItem('stats_sd',ev.target.result);}catch(e){}
+        showDashboard();
+      }
     }catch(err){toast('Invalid file: '+err.message);}
   };
   r.readAsText(f);
@@ -1042,6 +1091,7 @@ window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(S
 })();
 </script>
 
+<script>
 // Portrait lock
 function checkOrientation(){
   const p=document.getElementById('rotatePrompt');
@@ -1052,18 +1102,7 @@ if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landsca
 window.addEventListener('resize',checkOrientation);
 window.addEventListener('orientationchange',checkOrientation);
 checkOrientation();
+</script>
 
-<!-- PRICE SETTINGS MODAL -->
-<div class="price-modal-bg" id="priceModalBg">
-  <div class="price-modal">
-    <h3>💰 Monthly Prices per Group</h3>
-    <p>Set the monthly subscription fee for each programme group. These prices are used to calculate income statistics.</p>
-    <div id="priceRows"></div>
-    <div class="price-modal-footer">
-      <button class="pm-btn cancel" onclick="closePriceModal()">Cancel</button>
-      <button class="pm-btn save" onclick="savePrices()">Save Prices</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
