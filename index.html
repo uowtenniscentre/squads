@@ -1086,7 +1086,7 @@ async function encryptJSON(obj,key){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const enc=new TextEncoder();
   const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj)));
-  return{v:1,iv:btoa(String.fromCharCode(...iv)),data:btoa(new Uint8Array(cipher).reduce((s,b)=>s+String.fromCharCode(b),''))};
+  return{v:1,iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(cipher)))};
 }
 async function decryptJSON(envelope,key){
   const iv=Uint8Array.from(atob(envelope.iv),c=>c.charCodeAt(0));
@@ -1114,7 +1114,7 @@ async function encryptForExport(obj){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const enc=new TextEncoder();
   const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},encKey,enc.encode(JSON.stringify(obj)));
-  return{tenc:1,salt:localStorage.getItem(SALT_KEY),iv:btoa(String.fromCharCode(...iv)),data:btoa(new Uint8Array(cipher).reduce((s,b)=>s+String.fromCharCode(b),''))};
+  return{tenc:1,salt:localStorage.getItem(SALT_KEY),iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(cipher)))};
 }
 
 /* ── NAMES STORE ── */
@@ -2291,11 +2291,14 @@ function renderAdCh(){
   else{
     el.innerHTML=kids.map(ch=>{
       const cids=ch.classIds||[];
-      const badges=cids.map(cid=>{const cls=D.classes.find(c=>c.id===cid);const g=cls?GROUPS.find(g=>g.id===cls.group):null;return cls&&g?`<span class="gbadge ${g.css}">${cls.name}</span>`:''}).join(' ');
+      const badgeStack=cids.map(cid=>{const cls=D.classes.find(c=>c.id===cid);const g=cls?GROUPS.find(g=>g.id===cls.group):null;return cls&&g?`<span class="gbadge ${g.css}" style="font-size:.78rem;display:block;width:fit-content">${cls.name}</span>`:''}).filter(Boolean).join('');
       const pidStr=ch.playerID?` · ID: ${ch.playerID}`:'';
-      return`<div class="ai">
-        <div><div class="ai-name">${escapeHtml(ch.name)} ${badges}</div>
+      const count=cids.length;
+      return`<div class="ai" style="align-items:center;gap:10px">
+        <div style="flex:1;min-width:0"><div class="ai-name">${escapeHtml(ch.name)}</div>
         <div class="ai-sub">b. ${ch.birthYear}${pidStr}</div></div>
+        <div style="flex-shrink:0;font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--muted);letter-spacing:.05em;white-space:nowrap;padding:0 4px">( ${count} )</div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;flex-shrink:0">${badgeStack||'<span style="font-size:.72rem;color:var(--muted)">—</span>'}</div>
         <div class="ai-acts">
           <button class="btn btn-xs btn-outline" onclick="editCh('${ch.id}')">Edit</button>
           <button class="btn btn-xs" style="background:#92400e;color:#fff;border-radius:8px;border:none;padding:6px 10px;cursor:pointer;font-size:.72rem;font-weight:700" onclick="openArchiveMod('${ch.id}')">Leave Squads</button>
