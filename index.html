@@ -1086,7 +1086,7 @@ async function encryptJSON(obj,key){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const enc=new TextEncoder();
   const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj)));
-  return{v:1,iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(cipher)))};
+  return{v:1,iv:btoa(String.fromCharCode(...iv)),data:btoa(new Uint8Array(cipher).reduce((s,b)=>s+String.fromCharCode(b),''))};
 }
 async function decryptJSON(envelope,key){
   const iv=Uint8Array.from(atob(envelope.iv),c=>c.charCodeAt(0));
@@ -1114,7 +1114,7 @@ async function encryptForExport(obj){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const enc=new TextEncoder();
   const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},encKey,enc.encode(JSON.stringify(obj)));
-  return{tenc:1,salt:localStorage.getItem(SALT_KEY),iv:btoa(String.fromCharCode(...iv)),data:btoa(String.fromCharCode(...new Uint8Array(cipher)))};
+  return{tenc:1,salt:localStorage.getItem(SALT_KEY),iv:btoa(String.fromCharCode(...iv)),data:btoa(new Uint8Array(cipher).reduce((s,b)=>s+String.fromCharCode(b),''))};
 }
 
 /* ── NAMES STORE ── */

@@ -147,6 +147,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .rotate-icon{font-size:6rem;animation:spin90 1.5s ease-in-out infinite alternate}
 @keyframes spin90{from{transform:rotate(-45deg)}to{transform:rotate(45deg)}}
 .rotate-msg{color:#fff;font-family:'DM Sans',sans-serif;font-size:1.5rem;font-weight:600;letter-spacing:.05em;text-align:center;line-height:1.6;padding:0 30px}
+/* ── PIN GATE ── */
+#statsPin{position:fixed;inset:0;background:var(--bg);z-index:500;display:none;align-items:center;justify-content:center;}
+.spin-box{background:var(--card);border:1.5px solid var(--border2);border-radius:20px;padding:36px 32px 28px;width:340px;max-width:88vw;display:flex;flex-direction:column;align-items:center;}
+.spin-icon{font-size:2.6rem;margin-bottom:16px}
+.spin-title{font-size:1.15rem;font-weight:800;color:#fff;margin-bottom:6px;text-align:center}
+.spin-sub{font-size:.8rem;color:var(--muted2);text-align:center;margin-bottom:22px;line-height:1.5;max-width:260px}
+.spin-input{width:100%;padding:13px 16px;border:1.5px solid var(--border2);border-radius:11px;background:#22232a;color:var(--text);font-family:var(--mono);font-size:1.1rem;font-weight:600;letter-spacing:.25em;outline:none;text-align:center;margin-bottom:10px}
+.spin-input:focus{border-color:var(--accent)}
+.spin-btn{width:100%;padding:13px;border-radius:11px;border:none;background:var(--accent);color:#1a0030;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:800;cursor:pointer;transition:opacity .15s;margin-top:4px}
+.spin-btn:hover{opacity:.85}
+.spin-btn:disabled{opacity:.5;cursor:not-allowed}
+.spin-err{font-size:.76rem;color:#f87171;min-height:17px;text-align:center;margin-top:8px}
+
 /* ── APP LAYOUT ── */
 .title-topbar{background:#0C0C0C;height:100px;max-height:100px;padding:0;display:flex;align-items:center;position:fixed;top:0;left:0;right:0;z-index:60;border-bottom:1px solid rgba(164,153,244,0.3);overflow:hidden;box-sizing:border-box}
 .side-nav{position:fixed;left:0;top:100px;bottom:0;width:100px;background:#1a1b20;display:flex;flex-direction:column;align-items:center;padding:15px 8px 16px;gap:0;overflow-y:auto;scrollbar-width:none;border-right:1px solid rgba(255,255,255,.07);z-index:50}
@@ -355,6 +368,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <button class="topbar-load" onclick="triggerLoad()">📂 Load Stats File</button>
 </div>
 
+<!-- PIN GATE — shown on load when ta_salt/ta_v10_names exist in localStorage -->
+<div id="statsPin">
+  <div class="spin-box">
+    <div class="spin-icon">🔒</div>
+    <div class="spin-title">Statistics Viewer</div>
+    <div class="spin-sub">Enter the coaches PIN to access attendance statistics.</div>
+    <input type="password" id="statsPinInput" class="spin-input" placeholder="Enter PIN" maxlength="20" autocomplete="off">
+    <button class="spin-btn" id="statsPinBtn" onclick="submitStatsPin()">Unlock</button>
+    <div class="spin-err" id="statsPinErr"></div>
+  </div>
+</div>
+
 <div class="stats-main">
 <div class="stats-inner">
 <div id="dropZone">
@@ -365,7 +390,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="drop-hint">or drag & drop a .tenc or .json file anywhere on this page</div>
 </div>
 
-<div id="dashboard">
+<div id="dashboard" style="display:none">
 
   <div class="season-bar">
     <div><div class="season-bar-label">Season</div><div class="season-info" id="sbSeason">—</div></div>
@@ -533,13 +558,29 @@ async function readFile(f){
       if(isTenc){
         const envelope=JSON.parse(ev.target.result);
         if(!envelope.tenc){toast('Not a valid .tenc file');return;}
-        // Show PIN prompt
-        const pin=prompt('This is an encrypted stats file.\nEnter the coaches PIN to decrypt:');
-        if(pin===null)return;
-        if(!pin){toast('PIN required to open encrypted file');return;}
         let d;
-        try{d=await decryptEnvelope(envelope,pin);}
-        catch(e){toast('Decryption failed — incorrect PIN or corrupted file');return;}
+        if(statsKey){
+          // Key already verified at PIN gate — decrypt silently (no second prompt)
+          try{
+            const iv=Uint8Array.from(atob(envelope.iv),c=>c.charCodeAt(0));
+            const data=Uint8Array.from(atob(envelope.data),c=>c.charCodeAt(0));
+            const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv},statsKey,data);
+            d=JSON.parse(new TextDecoder().decode(plain));
+          }catch(e){
+            // Key mismatch — file was encrypted with a different PIN (e.g. exported from another device)
+            const pin=prompt('This file was encrypted with a different PIN.\nEnter the PIN used when it was exported:');
+            if(pin===null)return;
+            try{d=await decryptEnvelope(envelope,pin);}
+            catch(e2){toast('Decryption failed — incorrect PIN or corrupted file');return;}
+          }
+        }else{
+          // No session key (standalone / different device) — prompt as before
+          const pin=prompt('This is an encrypted stats file.\nEnter the coaches PIN to decrypt:');
+          if(pin===null)return;
+          if(!pin){toast('PIN required to open encrypted file');return;}
+          try{d=await decryptEnvelope(envelope,pin);}
+          catch(e){toast('Decryption failed — incorrect PIN or corrupted file');return;}
+        }
         if(!d.squads||!d.weeks){toast('Decrypted file is not a valid stats export');return;}
         SD=d;
         try{sessionStorage.setItem('stats_sd',JSON.stringify(d));}catch(e){}
@@ -1075,8 +1116,8 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 let _rt;
 window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(SD){if(activeTab==='overview')renderTrend();if(activeTab==='leavers')renderLeaversTab();}},120);});
 
-/* ── SESSION RESTORE — recover after browser-triggered reload ── */
-(function(){
+/* ── SESSION RESTORE — called after PIN gate passes (or immediately if no gate needed) ── */
+function attemptSessionRestore(){
   try{
     const raw=sessionStorage.getItem('stats_sd');
     if(!raw)return;
@@ -1084,11 +1125,87 @@ window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(S
     if(!d.squads||!d.weeks)return;
     SD=d;
     showDashboard();
-    // Restore the tab the user was on
     const tab=sessionStorage.getItem('stats_tab');
     if(tab&&document.getElementById('tab-'+tab))showTab(tab);
   }catch(e){}
+}
+
+/* ── PIN GATE & 60-SECOND BACKGROUND LOCK ── */
+const SALT_KEY='ta_salt';
+const NAMES_KEY='ta_v10_names';
+const PIN_LOCK_MS=60000; // 60 seconds
+let statsKey=null;       // AES-GCM key derived from PIN — in memory only
+let _hiddenAt=0;
+
+// On load: show PIN gate if app credentials exist in localStorage (same-origin as index.html).
+// Falls back to open access (no gate) if running on a different device or before first setup.
+(function initStatsPinGate(){
+  const salt=localStorage.getItem(SALT_KEY);
+  const namesBlob=localStorage.getItem(NAMES_KEY);
+  if(salt&&namesBlob){
+    document.getElementById('statsPin').style.display='flex';
+    document.getElementById('statsPinInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitStatsPin();});
+    setTimeout(()=>document.getElementById('statsPinInput').focus(),120);
+  }else{
+    // No stored credentials — open access (different device / app not yet set up)
+    attemptSessionRestore();
+  }
 })();
+
+async function submitStatsPin(){
+  const pin=document.getElementById('statsPinInput').value;
+  const errEl=document.getElementById('statsPinErr');
+  const btn=document.getElementById('statsPinBtn');
+  if(!pin){errEl.textContent='Please enter your PIN';return;}
+  errEl.textContent='';
+  btn.textContent='Verifying…';btn.disabled=true;
+  try{
+    const saltRaw=localStorage.getItem(SALT_KEY);
+    const salt=Uint8Array.from(atob(saltRaw),c=>c.charCodeAt(0));
+    const key=await deriveKey(pin,salt);
+    // Verify PIN by attempting to decrypt the names blob (same mechanism as index.html)
+    const namesEnv=JSON.parse(localStorage.getItem(NAMES_KEY));
+    const iv=Uint8Array.from(atob(namesEnv.iv),c=>c.charCodeAt(0));
+    const data=Uint8Array.from(atob(namesEnv.data),c=>c.charCodeAt(0));
+    await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data); // throws if PIN is wrong
+    statsKey=key;
+    document.getElementById('statsPin').style.display='none';
+    document.getElementById('statsPinInput').value='';
+    attemptSessionRestore();
+  }catch(e){
+    errEl.textContent='Incorrect PIN — please try again';
+    document.getElementById('statsPinInput').value='';
+    document.getElementById('statsPinInput').focus();
+  }finally{
+    btn.textContent='Unlock';btn.disabled=false;
+  }
+}
+
+function lockStats(){
+  statsKey=null;
+  SD=null;
+  _hiddenAt=0;
+  try{sessionStorage.removeItem('stats_sd');sessionStorage.removeItem('stats_tab');}catch(e){}
+  const main=document.querySelector('.stats-main');
+  if(main)main.scrollTop=0;
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('dropZone').style.display='flex';
+  document.getElementById('topbarMeta').style.display='none';
+  document.getElementById('statsPinInput').value='';
+  document.getElementById('statsPinErr').textContent='';
+  document.getElementById('statsPin').style.display='flex';
+  setTimeout(()=>document.getElementById('statsPinInput').focus(),50);
+}
+
+// PIN lock on background / screen lock — mirrors index.html behaviour
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){
+    if(statsKey)_hiddenAt=Date.now(); // only start timer if a session is active
+  }else{
+    if(_hiddenAt&&statsKey&&(Date.now()-_hiddenAt)>=PIN_LOCK_MS)lockStats();
+    _hiddenAt=0;
+  }
+});
 </script>
 
 <script>
