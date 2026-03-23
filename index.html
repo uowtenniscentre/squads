@@ -2295,10 +2295,11 @@ function renderAdCh(){
       const pidStr=ch.playerID?` · ID: ${ch.playerID}`:'';
       const count=cids.length;
       return`<div class="ai" style="align-items:center;gap:10px">
-        <div style="flex:1;min-width:0"><div class="ai-name">${escapeHtml(ch.name)}</div>
-        <div class="ai-sub">b. ${ch.birthYear}${pidStr}</div></div>
-        <div style="flex-shrink:0;font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--muted);letter-spacing:.05em;white-space:nowrap;padding:0 4px">( ${count} )</div>
-        <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;flex-shrink:0">${badgeStack||'<span style="font-size:.72rem;color:var(--muted)">—</span>'}</div>
+        <div style="flex:0 0 220px;min-width:0;overflow:hidden">
+          <div class="ai-name">${escapeHtml(ch.name)} <span style="padding-left:10px;font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--muted);letter-spacing:.05em">( ${count} )</span></div>
+          <div class="ai-sub">b. ${ch.birthYear}${pidStr}</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;align-items:flex-start">${badgeStack||'<span style="font-size:.72rem;color:var(--muted)">—</span>'}</div>
         <div class="ai-acts">
           <button class="btn btn-xs btn-outline" onclick="editCh('${ch.id}')">Edit</button>
           <button class="btn btn-xs" style="background:#92400e;color:#fff;border-radius:8px;border:none;padding:6px 10px;cursor:pointer;font-size:.72rem;font-weight:700" onclick="openArchiveMod('${ch.id}')">Leave Squads</button>
