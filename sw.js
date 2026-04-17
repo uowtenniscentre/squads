@@ -1,17 +1,23 @@
 // Junior Squads Attendance — Service Worker
 // Always fetches index.html fresh so updates come through immediately
 
-const CACHE = 'squads-v4';
+const CACHE = 'squads-v4-20260417'; // bump this date string on every deploy to force cache refresh
 const STATIC = [
   '/squads/manifest.json',
-  '/squads/icon-192.svg',
-  '/squads/icon-512.svg'
+  '/squads/icon-192.png',
+  '/squads/icon-512.png',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];
 
 // Install: cache only static assets, not index.html
+// Uses individual .add() calls (not addAll) so a single 404 doesn't abort the whole install
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC))
+    caches.open(CACHE).then(c =>
+      Promise.all(
+        STATIC.map(url => c.add(url).catch(err => console.warn('SW precache skipped:', url, err)))
+      )
+    )
   );
   self.skipWaiting();
 });

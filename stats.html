@@ -380,6 +380,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
+<!-- GENERIC INPUT MODAL — replaces native prompt() for PIN entry -->
+<div id="statsInputModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:center;justify-content:center;">
+  <div class="spin-box">
+    <div class="spin-icon" id="statsInputModalIcon">🔑</div>
+    <div class="spin-title" id="statsInputModalTitle">Enter PIN</div>
+    <div class="spin-sub" id="statsInputModalSub"></div>
+    <input type="password" id="statsInputModalInput" class="spin-input" placeholder="PIN" maxlength="20" autocomplete="off">
+    <button class="spin-btn" onclick="statsInputModalSubmit()">Confirm</button>
+    <button class="spin-btn" style="background:transparent;color:var(--muted2);margin-top:4px;font-size:.82rem" onclick="statsInputModalCancel()">Cancel</button>
+    <div class="spin-err" id="statsInputModalErr"></div>
+  </div>
+</div>
+
 <div class="stats-main">
 <div class="stats-inner">
 <div id="dropZone">
@@ -568,15 +581,14 @@ async function readFile(f){
             d=JSON.parse(new TextDecoder().decode(plain));
           }catch(e){
             // Key mismatch — file was encrypted with a different PIN (e.g. exported from another device)
-            const pin=prompt('This file was encrypted with a different PIN.\nEnter the PIN used when it was exported:');
-            if(pin===null)return;
+            const pin=await showStatsInputModal({icon:'🔑',title:'Different PIN',sub:'This file was encrypted with a different PIN. Enter the PIN used when it was exported.',placeholder:'PIN'});
+            if(!pin)return;
             try{d=await decryptEnvelope(envelope,pin);}
             catch(e2){toast('Decryption failed — incorrect PIN or corrupted file');return;}
           }
         }else{
-          // No session key (standalone / different device) — prompt as before
-          const pin=prompt('This is an encrypted stats file.\nEnter the coaches PIN to decrypt:');
-          if(pin===null)return;
+          // No session key (standalone / different device) — use modal instead of prompt()
+          const pin=await showStatsInputModal({icon:'🔒',title:'Encrypted File',sub:'This is an encrypted stats file. Enter the coaches PIN to decrypt.',placeholder:'PIN'});
           if(!pin){toast('PIN required to open encrypted file');return;}
           try{d=await decryptEnvelope(envelope,pin);}
           catch(e){toast('Decryption failed — incorrect PIN or corrupted file');return;}
@@ -1131,8 +1143,10 @@ function attemptSessionRestore(){
 }
 
 /* ── PIN GATE & 60-SECOND BACKGROUND LOCK ── */
-const SALT_KEY='ta_salt';
-const NAMES_KEY='ta_v10_names';
+const DATA_VERSION=10; // must match index.html — bump together on any breaking schema change
+const DATA_KEY='ta_v'+DATA_VERSION;           // 'ta_v10'
+const SALT_KEY='ta_enc_salt';                 // was incorrectly 'ta_salt' — fixed to match index.html
+const NAMES_KEY='ta_v'+DATA_VERSION+'_names'; // 'ta_v10_names'
 const PIN_LOCK_MS=60000; // 60 seconds
 let statsKey=null;       // AES-GCM key derived from PIN — in memory only
 let _hiddenAt=0;
@@ -1142,6 +1156,18 @@ let _hiddenAt=0;
 (function initStatsPinGate(){
   const salt=localStorage.getItem(SALT_KEY);
   const namesBlob=localStorage.getItem(NAMES_KEY);
+  // Version mismatch check: warn if an older data key exists but the current one doesn't
+  if(!namesBlob){
+    for(let v=DATA_VERSION-1;v>=1;v--){
+      if(localStorage.getItem('ta_v'+v+'_names')){
+        const w=document.createElement('div');
+        w.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#7f1d1d;color:#fca5a5;padding:12px 20px;font-size:.88rem;font-weight:700;text-align:center';
+        w.textContent=`⚠ Data is from app version ${v} but this stats page expects version ${DATA_VERSION}. Open index.html first to migrate data.`;
+        document.body.prepend(w);
+        break;
+      }
+    }
+  }
   if(salt&&namesBlob){
     document.getElementById('statsPin').style.display='flex';
     document.getElementById('statsPinInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitStatsPin();});
@@ -1152,7 +1178,17 @@ let _hiddenAt=0;
   }
 })();
 
+const STATS_PIN_MAX_ATTEMPTS=5;
+const STATS_PIN_LOCKOUT_MS=5*60*1000;
+function statsPinAttempts(){return parseInt(sessionStorage.getItem('ta_stats_attempts')||'0');}
+function statsPinLockedUntil(){return parseInt(sessionStorage.getItem('ta_stats_lockout')||'0');}
 async function submitStatsPin(){
+  const lockUntil=statsPinLockedUntil();
+  if(lockUntil&&Date.now()<lockUntil){
+    const mins=Math.ceil((lockUntil-Date.now())/60000);
+    document.getElementById('statsPinErr').textContent=`Too many attempts — try again in ${mins} min.`;
+    return;
+  }
   const pin=document.getElementById('statsPinInput').value;
   const errEl=document.getElementById('statsPinErr');
   const btn=document.getElementById('statsPinBtn');
@@ -1169,11 +1205,22 @@ async function submitStatsPin(){
     const data=Uint8Array.from(atob(namesEnv.data),c=>c.charCodeAt(0));
     await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data); // throws if PIN is wrong
     statsKey=key;
+    sessionStorage.removeItem('ta_stats_attempts');
+    sessionStorage.removeItem('ta_stats_lockout');
     document.getElementById('statsPin').style.display='none';
     document.getElementById('statsPinInput').value='';
+    resetStatsActivity();
     attemptSessionRestore();
   }catch(e){
-    errEl.textContent='Incorrect PIN — please try again';
+    const attempts=statsPinAttempts()+1;
+    sessionStorage.setItem('ta_stats_attempts',String(attempts));
+    const remaining=STATS_PIN_MAX_ATTEMPTS-attempts;
+    if(attempts>=STATS_PIN_MAX_ATTEMPTS){
+      sessionStorage.setItem('ta_stats_lockout',String(Date.now()+STATS_PIN_LOCKOUT_MS));
+      errEl.textContent='Too many attempts — locked for 5 minutes.';
+    }else{
+      errEl.textContent=`Incorrect PIN — ${remaining} attempt${remaining===1?'':'s'} remaining.`;
+    }
     document.getElementById('statsPinInput').value='';
     document.getElementById('statsPinInput').focus();
   }finally{
@@ -1181,10 +1228,39 @@ async function submitStatsPin(){
   }
 }
 
+/* ── GENERIC INPUT MODAL (replaces native prompt() in stats.html) ── */
+let _statsInputModalResolve=null;
+function showStatsInputModal({icon='🔑',title='',sub='',placeholder='PIN'}={}){
+  return new Promise(resolve=>{
+    _statsInputModalResolve=resolve;
+    document.getElementById('statsInputModalIcon').textContent=icon;
+    document.getElementById('statsInputModalTitle').textContent=title;
+    document.getElementById('statsInputModalSub').textContent=sub;
+    const inp=document.getElementById('statsInputModalInput');
+    inp.placeholder=placeholder;
+    inp.value='';
+    document.getElementById('statsInputModalErr').textContent='';
+    const modal=document.getElementById('statsInputModal');
+    modal.style.display='flex';
+    setTimeout(()=>inp.focus(),80);
+    inp.onkeydown=e=>{if(e.key==='Enter')statsInputModalSubmit();if(e.key==='Escape')statsInputModalCancel();};
+  });
+}
+function statsInputModalSubmit(){
+  const val=document.getElementById('statsInputModalInput').value;
+  document.getElementById('statsInputModal').style.display='none';
+  if(_statsInputModalResolve){_statsInputModalResolve(val||null);_statsInputModalResolve=null;}
+}
+function statsInputModalCancel(){
+  document.getElementById('statsInputModal').style.display='none';
+  if(_statsInputModalResolve){_statsInputModalResolve(null);_statsInputModalResolve=null;}
+}
+
 function lockStats(){
   statsKey=null;
   SD=null;
   _hiddenAt=0;
+  if(_statsInactiveTimer){clearInterval(_statsInactiveTimer);_statsInactiveTimer=null;}
   try{sessionStorage.removeItem('stats_sd');sessionStorage.removeItem('stats_tab');}catch(e){}
   const main=document.querySelector('.stats-main');
   if(main)main.scrollTop=0;
@@ -1206,6 +1282,22 @@ document.addEventListener('visibilitychange',()=>{
     _hiddenAt=0;
   }
 });
+
+// Inactivity timer — mirrors index.html: locks after PIN_LOCK_MS of no touch/click activity
+let _lastStatsActivity=Date.now();
+let _statsInactiveTimer=null;
+function resetStatsActivity(){
+  _lastStatsActivity=Date.now();
+  if(_statsInactiveTimer)clearInterval(_statsInactiveTimer);
+  _statsInactiveTimer=setInterval(()=>{
+    if(statsKey&&(Date.now()-_lastStatsActivity)>=PIN_LOCK_MS){
+      lockStats();
+    }
+  },15000);
+}
+['touchstart','touchmove','touchend','click'].forEach(evt=>
+  document.addEventListener(evt,()=>{if(statsKey)resetStatsActivity();},{passive:true,capture:true})
+);
 </script>
 
 <script>

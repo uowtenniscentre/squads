@@ -597,6 +597,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
           <div style="flex:1;height:1px;background:var(--border)"></div>
         </div>
         <div style="margin-bottom:12px">
+          <div style="font-size:.75rem;color:var(--holiday);margin-bottom:6px">⚠ Excel exports are unencrypted — delete from Downloads after use.</div>
           <button class="btn btn-sm btn-outline" onclick="exportLeaversExcel()">⬇ Export Leavers Excel</button>
         </div>
         <div id="leaversList"></div>
@@ -798,6 +799,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
   </div>
 </div>
 
+<!-- GENERIC INPUT MODAL (replaces native prompt() calls) -->
+<div id="inputModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:center;justify-content:center;">
+  <div class="pw-box" style="max-width:340px">
+    <div class="pw-icon" id="inputModalIcon">🔒</div>
+    <div class="pw-title" id="inputModalTitle">Confirm</div>
+    <div class="pw-sub" id="inputModalSub"></div>
+    <input class="pw-inp" id="inputModalInp" placeholder="" maxlength="50"
+           onkeydown="if(event.key==='Enter')_inputModalConfirm();if(event.key==='Escape')_inputModalCancel()">
+    <div class="pw-err" id="inputModalErr"></div>
+    <div class="pw-btns">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="_inputModalCancel()">Cancel</button>
+      <button class="btn btn-g btn-sm"     style="flex:1" onclick="_inputModalConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- PIN ENTRY SCREEN -->
 <div id="pinScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center">
   <div class="pw-box" style="max-width:340px">
@@ -807,8 +824,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
     <input class="pw-inp" type="password" id="pinInp" placeholder="PIN" maxlength="30" inputmode="numeric"
            onkeydown="if(event.key==='Enter')submitPin()">
     <div class="pw-err" id="pinErr"></div>
+    <div id="pinLockMsg" style="display:none;margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171;font-size:.82rem;text-align:center"></div>
     <div class="pw-btns">
-      <button class="btn btn-g btn-sm" style="flex:1" onclick="submitPin()">Unlock</button>
+      <button class="btn btn-g btn-sm" style="flex:1" id="pinSubmitBtn" onclick="submitPin()">Unlock</button>
     </div>
   </div>
 </div>
@@ -859,6 +877,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
     </div>
     <button class="btn btn-outline btn-full btn-sm" style="margin-bottom:10px" onclick="exportSetupBackup()">⬇ Download plain backup now (recommended)</button>
     <button class="btn btn-g btn-full" onclick="closeRecoveryModal()">I've written it down — Continue</button>
+  </div>
+</div>
+
+<!-- RECOVERY CODE MODAL -->
+<div id="recoveryViewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:410;align-items:center;justify-content:center">
+  <div class="pw-box" style="max-width:380px;text-align:left;padding:28px">
+    <div class="pw-title">👁 Recovery PIN</div>
+    <div class="pw-sub" style="margin-bottom:16px">This is the coaches PIN. Write it down and store it securely offline — do not share it digitally.</div>
+    <div style="position:relative;margin-bottom:6px">
+      <input id="recoveryPinDisplay" type="password" readonly
+        style="width:100%;padding:14px 48px 14px 16px;border-radius:10px;border:1.5px solid rgba(164,153,244,.5);background:#1a1b22;color:#A499F4;font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;letter-spacing:.15em;outline:none;cursor:default">
+      <button onclick="toggleRecoveryPinVisibility()" id="recoveryPinToggle" title="Show / hide PIN"
+        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--muted)">👁</button>
+    </div>
+    <div id="recoveryPinTimer" style="font-size:.75rem;color:#f87171;margin-bottom:16px;text-align:right"></div>
+    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:11px 14px;font-size:.8rem;color:#fbbf24;margin-bottom:18px">
+      ⚠ This window closes automatically after 30 seconds. The PIN is not stored anywhere else after this.
+    </div>
+    <button class="btn btn-ghost btn-sm btn-full" onclick="hideRecoveryViewModal()">Close</button>
   </div>
 </div>
 
@@ -1000,7 +1037,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);-we
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+<div id="storageBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#7f1d1d;color:#fca5a5;padding:12px 20px;font-size:.88rem;font-weight:700;text-align:center;border-top:2px solid #f87171">
+  ⚠ Storage full — attendance changes are <strong>not being saved</strong>. Export a backup immediately, then wipe old data via Admin → Data.
+</div>
 
 <!-- SQUAD PLAYERS MODAL -->
 <div class="modal-bg" id="mSqpList">
@@ -1029,25 +1069,33 @@ const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 const DAYNAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 /* ── SECURITY CONSTANTS ── */
 const PBKDF2_ITER=250000;
+const DATA_VERSION=10;
+const DATA_KEY='ta_v'+DATA_VERSION; // 'ta_v10' — bump DATA_VERSION on any breaking schema change
 const SALT_KEY='ta_enc_salt';
 const ADMIN_PW_KEY='ta_admin_pw';
-const NAMES_KEY='ta_v10_names';
+const NAMES_KEY='ta_v'+DATA_VERSION+'_names'; // 'ta_v10_names'
 const RECOVERY_KEY='ta_recovery';
 let encKey=null; // AES-GCM CryptoKey — in memory only, never persisted
 
 /* ── DATA ── */
 let D={classes:[],children:[],attendance:{},activeWeeks:[],seasonYear:2025};
 function loadD(){
-  const raw=localStorage.getItem('ta_v10');
+  const raw=localStorage.getItem(DATA_KEY);
   if(raw){
     try{
       const parsed=JSON.parse(raw);
+      // Shape guard — ensure top-level keys are the expected types before assigning.
+      // A corrupt/truncated blob would otherwise propagate into D and crash on first render.
+      if(!parsed||typeof parsed!=='object')throw new Error('Stored data is not an object');
+      if(parsed.classes!==undefined&&!Array.isArray(parsed.classes))throw new Error('classes is not an array');
+      if(parsed.children!==undefined&&!Array.isArray(parsed.children))throw new Error('children is not an array');
+      if(parsed.attendance!==undefined&&(typeof parsed.attendance!=='object'||Array.isArray(parsed.attendance)))throw new Error('attendance is not an object');
       D=parsed;
     }catch(e){
       // JSON was corrupted — do NOT overwrite with empty D, do NOT call initWeeks
       // Show a persistent warning and bail out so real data isn't destroyed
-      console.error('ta_v10 parse failed — leaving data untouched',e);
-      setTimeout(()=>toast('⚠️ Data read error — please restore from backup JSON'),500);
+      console.error('ta_v10 parse/validate failed — leaving data untouched',e);
+      setTimeout(()=>toast('⚠️ Data read error — please restore from backup'),500);
       return;
     }
   }
@@ -1067,8 +1115,20 @@ function saveD(){
       const {name,playerID,...rest}=c;
       return rest;
     })};
-    localStorage.setItem('ta_v10',JSON.stringify(stripped));
-  }catch(e){toast('Storage full — export backup!');}
+    localStorage.setItem(DATA_KEY,JSON.stringify(stripped));
+  }catch(e){
+    document.getElementById('storageBanner').style.display='block';
+    toast('⚠ Storage full — data not saved! See red banner.');
+  }
+}
+async function checkStorageQuota(){
+  if(!navigator.storage||!navigator.storage.estimate)return;
+  try{
+    const {usage,quota}=await navigator.storage.estimate();
+    if(quota>0&&usage/quota>0.8){
+      toast('⚠ Storage nearly full ('+(Math.round(usage/quota*100))+'%) — export backup soon');
+    }
+  }catch(e){}
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -1135,11 +1195,43 @@ async function loadNames(key){
   D.children.forEach(c=>{if(ns[c.id]){c.name=ns[c.id].name||'';c.playerID=ns[c.id].playerID||'';}});
 }
 
+/* ── SESSION PIN OBFUSCATION ── */
+// The pending recovery PIN must survive a service-worker page reload within the same tab.
+// We encrypt it with an ephemeral AES-GCM key that is also stored in sessionStorage,
+// so both key and ciphertext share the same scope/lifetime — this removes plain-text
+// exposure from casual DevTools inspection without pretending to be strong crypto.
+async function storeSessionPin(pin){
+  const key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(pin));
+  const jwk=await crypto.subtle.exportKey('jwk',key);
+  sessionStorage.setItem('_rk',JSON.stringify(jwk));
+  sessionStorage.setItem('_ri',btoa(String.fromCharCode(...iv)));
+  sessionStorage.setItem('_rd',btoa(new Uint8Array(cipher).reduce((s,b)=>s+String.fromCharCode(b),'')));
+  sessionStorage.removeItem('pendingRecoveryPin'); // remove legacy plain-text item if present
+}
+async function loadSessionPin(){
+  const jwkStr=sessionStorage.getItem('_rk');
+  const ivStr=sessionStorage.getItem('_ri');
+  const dataStr=sessionStorage.getItem('_rd');
+  if(!jwkStr||!ivStr||!dataStr)return null;
+  try{
+    const key=await crypto.subtle.importKey('jwk',JSON.parse(jwkStr),{name:'AES-GCM'},false,['decrypt']);
+    const iv=Uint8Array.from(atob(ivStr),c=>c.charCodeAt(0));
+    const data=Uint8Array.from(atob(dataStr),c=>c.charCodeAt(0));
+    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+    return new TextDecoder().decode(plain);
+  }catch(e){return null;}
+}
+function clearSessionPin(){
+  ['_rk','_ri','_rd','pendingRecoveryPin'].forEach(k=>sessionStorage.removeItem(k));
+}
+
 /* ── SECURITY FLOW ── */
 async function checkSecurity(){
   // If a setup just completed but the page was reloaded (e.g. by service worker activating),
   // re-show the recovery modal so the admin can note down their PIN.
-  const pendingPin=sessionStorage.getItem('pendingRecoveryPin');
+  const pendingPin=await loadSessionPin();
   if(pendingPin){showRecoveryModal(pendingPin);return;}
   const hasPw=!!localStorage.getItem(ADMIN_PW_KEY);
   const hasNames=!!localStorage.getItem(NAMES_KEY);
@@ -1152,17 +1244,42 @@ function unlockApp(){
   document.getElementById('setupScreen').style.display='none';
   renderToday();
   checkAutoBackup();
+  checkStorageQuota();
 }
 
 /* ── PIN PROMPT ── */
+const PIN_MAX_ATTEMPTS=5;
+const PIN_LOCKOUT_MS=5*60*1000; // 5 minutes
+function pinAttempts(){return parseInt(sessionStorage.getItem('pinAttempts')||'0');}
+function pinLockedUntil(){return parseInt(sessionStorage.getItem('pinLockedUntil')||'0');}
 function showPinPrompt(){
   const el=document.getElementById('pinScreen');
   el.style.display='flex';
   document.getElementById('pinInp').value='';
   document.getElementById('pinErr').textContent='';
-  setTimeout(()=>document.getElementById('pinInp').focus(),200);
+  _checkPinLockout();
+  setTimeout(()=>{if(!pinLockedUntil()||Date.now()>=pinLockedUntil())document.getElementById('pinInp').focus();},200);
+}
+function _checkPinLockout(){
+  const lockUntil=pinLockedUntil();
+  const lockMsg=document.getElementById('pinLockMsg');
+  const btn=document.getElementById('pinSubmitBtn');
+  const inp=document.getElementById('pinInp');
+  if(lockUntil&&Date.now()<lockUntil){
+    const secsLeft=Math.ceil((lockUntil-Date.now())/1000);
+    const mins=Math.floor(secsLeft/60),secs=secsLeft%60;
+    lockMsg.style.display='block';
+    lockMsg.textContent=`Too many incorrect attempts. Try again in ${mins}:${String(secs).padStart(2,'0')}.`;
+    btn.disabled=true;inp.disabled=true;
+    setTimeout(_checkPinLockout,1000);
+  }else{
+    lockMsg.style.display='none';
+    btn.disabled=false;inp.disabled=false;
+    if(lockUntil){sessionStorage.removeItem('pinLockedUntil');sessionStorage.removeItem('pinAttempts');}
+  }
 }
 async function submitPin(){
+  if(pinLockedUntil()&&Date.now()<pinLockedUntil())return;
   const pin=document.getElementById('pinInp').value.trim();
   if(!pin){document.getElementById('pinErr').textContent='Please enter your PIN.';return;}
   const saltB64=localStorage.getItem(SALT_KEY);
@@ -1172,11 +1289,22 @@ async function submitPin(){
     const key=await deriveKey(pin,salt);
     await loadNames(key); // throws DOMException if wrong key
     encKey=key;
+    sessionStorage.removeItem('pinAttempts');
+    sessionStorage.removeItem('pinLockedUntil');
     unlockApp();
   }catch(e){
-    document.getElementById('pinErr').textContent='Incorrect PIN — try again.';
+    const attempts=pinAttempts()+1;
+    sessionStorage.setItem('pinAttempts',String(attempts));
+    const remaining=PIN_MAX_ATTEMPTS-attempts;
+    if(attempts>=PIN_MAX_ATTEMPTS){
+      sessionStorage.setItem('pinLockedUntil',String(Date.now()+PIN_LOCKOUT_MS));
+      document.getElementById('pinErr').textContent='';
+      _checkPinLockout();
+    }else{
+      document.getElementById('pinErr').textContent=`Incorrect PIN — ${remaining} attempt${remaining!==1?'s':''} remaining.`;
+    }
     document.getElementById('pinInp').value='';
-    document.getElementById('pinInp').focus();
+    if(attempts<PIN_MAX_ATTEMPTS)document.getElementById('pinInp').focus();
   }
 }
 
@@ -1217,8 +1345,8 @@ async function completeSetup(){
     // Always write ta_v10_names — ensures PIN prompt fires on next open even with zero children
     await saveNames();
     if(D.children.length>0){saveD();}
-    // Persist PIN so recovery modal survives a service-worker-triggered page reload
-    sessionStorage.setItem('pendingRecoveryPin',pin);
+    // Persist PIN (obfuscated) so recovery modal survives a service-worker-triggered page reload
+    await storeSessionPin(pin);
     // Show recovery code screen
     document.getElementById('setupScreen').style.display='none';
     showRecoveryModal(pin);
@@ -1236,14 +1364,15 @@ function showRecoveryModal(pin){
   document.getElementById('recoveryModal').style.display='flex';
 }
 function closeRecoveryModal(){
-  sessionStorage.removeItem('pendingRecoveryPin');
+  clearSessionPin();
   document.getElementById('recoveryModal').style.display='none';
   unlockApp();
 }
 async function exportSetupBackup(){
-  // Plain JSON backup before encryption is fully relied upon
+  // Plain JSON backup — strip names/playerIDs so the file matches the pseudonymised ta_v10 structure
   const a=document.createElement('a');
-  const backup={...D,_exportedAt:new Date().toISOString()};
+  const stripped={...D,children:D.children.map(c=>{const{name,playerID,...rest}=c;return rest;})};
+  const backup={...stripped,_exportedAt:new Date().toISOString()};
   a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
   a.download=`tennis-backup-SETUP-${new Date().toISOString().split('T')[0]}.json`;
   a.click();URL.revokeObjectURL(a.href);toast('Plain backup downloaded — store safely ✓');
@@ -1283,7 +1412,7 @@ async function submitChangePin(){
     const newKey=await deriveKey(nw,newSalt);
     encKey=newKey;
     localStorage.setItem(SALT_KEY,newSaltB64);
-    if(D.children.length>0)await saveNames();
+    await saveNames(); // always re-encrypt names regardless of count
     // Re-encrypt recovery blob under same admin password (need to know it... use existing stored hash)
     // We can't re-derive the admin key without the admin password, so we just note the recovery code is now stale
     // Admin should use "View Recovery Code" (which will fail) and set new via Change PIN flow
@@ -1318,22 +1447,29 @@ async function submitChangeAdminPw(){
     err.textContent='Updating…';
     const newHash=await hashPassword(nw);
     localStorage.setItem(ADMIN_PW_KEY,JSON.stringify(newHash));
-    // Re-encrypt recovery blob (contains the PIN) under new admin password
+    // Re-encrypt recovery blob (contains the PIN) under new admin password.
+    // We already verified the old admin password above, so use it to decrypt
+    // the existing recovery record directly — no need to ask for the PIN again.
     const curSaltB64=localStorage.getItem(SALT_KEY);
-    if(curSaltB64&&encKey){
-      // Re-derive recovery using new admin pw
-      const recSalt=crypto.getRandomValues(new Uint8Array(16));
-      const recKey=await deriveKey(nw,recSalt);
-      // We need the current PIN — but we can only get it if recovery exists
-      // Instead, encrypt a placeholder noting PIN is unknown
-      // Best practice: ask user for the PIN here
-      const pinVal=prompt('Enter the current coaches PIN to update recovery record (needed to keep recovery working):');
-      if(pinVal){
-        const recBlob=await encryptJSON({pin:pinVal},recKey);
-        recBlob.salt=btoa(String.fromCharCode(...recSalt));
-        localStorage.setItem(RECOVERY_KEY,JSON.stringify(recBlob));
-      }else{
-        localStorage.removeItem(RECOVERY_KEY);
+    if(curSaltB64){
+      const recRaw=localStorage.getItem(RECOVERY_KEY);
+      if(recRaw){
+        try{
+          const oldRecBlob=JSON.parse(recRaw);
+          const oldRecSalt=Uint8Array.from(atob(oldRecBlob.salt),c=>c.charCodeAt(0));
+          const oldRecKey=await deriveKey(cur,oldRecSalt); // cur = verified old admin pw
+          const recData=await decryptJSON(oldRecBlob,oldRecKey);
+          // Re-encrypt the same PIN under the new admin password
+          const newRecSalt=crypto.getRandomValues(new Uint8Array(16));
+          const newRecKey=await deriveKey(nw,newRecSalt);
+          const newRecBlob=await encryptJSON({pin:recData.pin},newRecKey);
+          newRecBlob.salt=btoa(String.fromCharCode(...newRecSalt));
+          localStorage.setItem(RECOVERY_KEY,JSON.stringify(newRecBlob));
+        }catch(e){
+          // Recovery decrypt failed — remove stale record and warn
+          localStorage.removeItem(RECOVERY_KEY);
+          toast('⚠️ Recovery record could not be migrated. Use Change PIN to set a new one.');
+        }
       }
     }
     hideChangeAdminPwModal();
@@ -1341,10 +1477,11 @@ async function submitChangeAdminPw(){
     renderAdData();
   }catch(e){err.textContent='Failed: '+e.message;}
 }
+let _recoveryAutoCloseTimer=null;
 async function viewRecoveryCode(){
   const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
   if(!stored){toast('No admin password set');return;}
-  const pw=prompt('Enter admin password to view recovery code:');
+  const pw=await showInputModal({title:'View Recovery Code',sub:'Enter admin password to continue',placeholder:'Admin password'});
   if(!pw)return;
   const ok=await verifyPassword(pw,stored);
   if(!ok){toast('Incorrect admin password');return;}
@@ -1355,8 +1492,37 @@ async function viewRecoveryCode(){
     const recSalt=Uint8Array.from(atob(recBlob.salt),c=>c.charCodeAt(0));
     const recKey=await deriveKey(pw,recSalt);
     const data=await decryptJSON(recBlob,recKey);
-    alert(`Recovery PIN: ${data.pin}\n\nThis is the coaches PIN. Store it safely offline.`);
+    // Show styled modal instead of alert()
+    const inp=document.getElementById('recoveryPinDisplay');
+    inp.value=data.pin;
+    inp.type='password'; // start hidden
+    document.getElementById('recoveryPinToggle').textContent='👁';
+    document.getElementById('recoveryViewModal').style.display='flex';
+    // Auto-close countdown (30 seconds)
+    clearTimeout(_recoveryAutoCloseTimer);
+    let secs=30;
+    const timerEl=document.getElementById('recoveryPinTimer');
+    function tick(){
+      timerEl.textContent=`Auto-closes in ${secs}s`;
+      if(secs<=0){hideRecoveryViewModal();return;}
+      secs--;
+      _recoveryAutoCloseTimer=setTimeout(tick,1000);
+    }
+    tick();
   }catch(e){toast('Could not decrypt recovery — it may be from a different admin password.');}
+}
+function hideRecoveryViewModal(){
+  clearTimeout(_recoveryAutoCloseTimer);
+  const inp=document.getElementById('recoveryPinDisplay');
+  inp.value='';inp.type='password';
+  document.getElementById('recoveryPinTimer').textContent='';
+  document.getElementById('recoveryViewModal').style.display='none';
+}
+function toggleRecoveryPinVisibility(){
+  const inp=document.getElementById('recoveryPinDisplay');
+  const btn=document.getElementById('recoveryPinToggle');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁';}
 }
 function renderAdData(){
   // Render encryption status section
@@ -1407,7 +1573,7 @@ function seasonWks(y){
   // Range: last week of August (year y) through first week of August (year y+1)
   // Gives coaches the full span to pick their W1 start and final week
   const all=[...allY(y),...allY(y+1)];
-  const s=toWK(new Date(y,7,24));   // ~last week of Aug
+  const s=toWK(new Date(y,7,31));   // last day of Aug → always the final ISO week of August
   const e=toWK(new Date(y+1,7,7));  // ~first week of Aug next year
   const seen=new Set();
   return all.filter(w=>{if(seen.has(w))return false;seen.add(w);return w>=s&&w<=e;});
@@ -1423,23 +1589,74 @@ function initWeeks(){D.activeWeeks=seasonWks(D.seasonYear||2025);saveD();}
 
 /* ── PASSWORD ── */
 // pwScreen uses plain display style — no class toggling
+/* ── GENERIC INPUT MODAL (replaces native prompt()) ── */
+let _inputModalResolve=null;
+function showInputModal({icon='🔒',title='',sub='',placeholder='',type='password'}={}){
+  return new Promise(resolve=>{
+    _inputModalResolve=resolve;
+    document.getElementById('inputModalIcon').textContent=icon;
+    document.getElementById('inputModalTitle').textContent=title;
+    document.getElementById('inputModalSub').textContent=sub;
+    document.getElementById('inputModalErr').textContent='';
+    const inp=document.getElementById('inputModalInp');
+    inp.value='';inp.placeholder=placeholder;inp.type=type;
+    document.getElementById('inputModal').style.display='flex';
+    setTimeout(()=>inp.focus(),100);
+  });
+}
+function _inputModalConfirm(){
+  const val=document.getElementById('inputModalInp').value;
+  document.getElementById('inputModal').style.display='none';
+  if(_inputModalResolve){_inputModalResolve(val);_inputModalResolve=null;}
+}
+function _inputModalCancel(){
+  document.getElementById('inputModal').style.display='none';
+  if(_inputModalResolve){_inputModalResolve(null);_inputModalResolve=null;}
+}
+
+const PW_MAX_ATTEMPTS=5;
+const PW_LOCKOUT_MS=5*60*1000;
+function pwAttempts(){return parseInt(sessionStorage.getItem('ta_pw_attempts')||'0');}
+function pwLockedUntil(){return parseInt(sessionStorage.getItem('ta_pw_lockout')||'0');}
 function openPw(){
   if(!localStorage.getItem(ADMIN_PW_KEY)){showFirstTimeSetup();return;}
   document.getElementById('pwInp').value='';
-  document.getElementById('pwErr').textContent='';
+  const errEl=document.getElementById('pwErr');
+  errEl.textContent='';
+  const lockUntil=pwLockedUntil();
+  if(lockUntil&&Date.now()<lockUntil){
+    const mins=Math.ceil((lockUntil-Date.now())/60000);
+    errEl.textContent=`Too many attempts — try again in ${mins} min.`;
+  }
   document.getElementById('pwScreen').style.display='flex';
   setTimeout(()=>document.getElementById('pwInp').focus(),200);
 }
 async function submitPw(){
+  const lockUntil=pwLockedUntil();
+  if(lockUntil&&Date.now()<lockUntil){
+    const mins=Math.ceil((lockUntil-Date.now())/60000);
+    document.getElementById('pwErr').textContent=`Too many attempts — try again in ${mins} min.`;
+    return;
+  }
   const v=document.getElementById('pwInp').value;
   const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
   if(!stored){document.getElementById('pwErr').textContent='No admin password set.';return;}
   const ok=await verifyPassword(v,stored);
   if(ok){
+    sessionStorage.removeItem('ta_pw_attempts');
+    sessionStorage.removeItem('ta_pw_lockout');
     document.getElementById('pwScreen').style.display='none';
     openAdmin();
   }else{
-    document.getElementById('pwErr').textContent='Incorrect password — try again.';
+    const attempts=pwAttempts()+1;
+    sessionStorage.setItem('ta_pw_attempts',String(attempts));
+    const remaining=PW_MAX_ATTEMPTS-attempts;
+    if(attempts>=PW_MAX_ATTEMPTS){
+      sessionStorage.setItem('ta_pw_lockout',String(Date.now()+PW_LOCKOUT_MS));
+      document.getElementById('pwErr').textContent='Too many attempts — locked for 5 minutes.';
+    }else{
+      document.getElementById('pwErr').textContent=`Incorrect password — ${remaining} attempt${remaining===1?'':'s'} remaining.`;
+    }
     document.getElementById('pwInp').value='';
   }
 }
@@ -1600,7 +1817,7 @@ function renderToday(){
        html+=`<div class="cls-card" onclick="openAttFromToday('${c.id}')">
          <div style="flex:1">
            <div class="cls-name">${escapeHtml(c.name)}</div>
-           <div class="cls-meta">👤 ${c.coach} · ${n} player${n!==1?'s':''}</div>
+           <div class="cls-meta">👤 ${escapeHtml(c.coach)} · ${n} player${n!==1?'s':''}</div>
          </div>
          ${badge}
        </div>`;
@@ -1773,7 +1990,7 @@ function renderGroups(){
       const n=D.children.filter(ch=>(!ch.status||ch.status==='active')&&(ch.classIds||[ch.classId]).includes(c.id)).length;
       html+=`<div class="cls-card" onclick="openAtt('${c.id}')">
         <div><div class="cls-name">${escapeHtml(c.name)}</div>
-        <div class="cls-meta"><strong>${c.coach}</strong> · ${c.day} · ${n} player${n!==1?'s':''}</div></div>
+        <div class="cls-meta"><strong>${escapeHtml(c.coach)}</strong> · ${c.day} · ${n} player${n!==1?'s':''}</div></div>
         <div class="cls-badge">${n}</div></div>`;
     });
     html+='</div></div>';
@@ -1854,7 +2071,7 @@ function updateDateBanner(){
             <span style="display:inline-block;background:${accent};color:#000;font-size:.81rem;font-weight:900;letter-spacing:1px;text-transform:uppercase;padding:3px 14px;border-radius:20px">${g.label}</span>
           </div>
           <div style="display:flex;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;gap:2px;line-height:1.3">${nameHtml}</div>
-          <div style="font-size:.94rem;color:rgba(255,255,255,.55);margin-top:4px">Coaches: <strong style="color:#fff;font-weight:700">${c.coach}</strong></div>
+          <div style="font-size:.94rem;color:rgba(255,255,255,.55);margin-top:4px">Coaches: <strong style="color:#fff;font-weight:700">${escapeHtml(c.coach)}</strong></div>
         </div>
       </div>
     </div>`;
@@ -2099,7 +2316,7 @@ function renderStats(){
   html+='</div>';
   if(notes.length){
     html+=`<div class="card"><div class="sec-lbl">📝 Recent Notes</div>`;
-    notes.forEach(n=>{html+=`<div class="note-card"><div class="note-wk">${wkLbl(n.w)} · ${n.w}</div><div class="note-txt">${n.n.replace(/\n/g,'<br>')}</div></div>`;});
+    notes.forEach(n=>{html+=`<div class="note-card"><div class="note-wk">${wkLbl(n.w)} · ${n.w}</div><div class="note-txt">${escapeHtml(n.n).replace(/\n/g,'<br>')}</div></div>`;});
     html+='</div>';
   }
   out.innerHTML=html;
@@ -2107,8 +2324,8 @@ function renderStats(){
 
 /* ── CALENDAR ── */
 function renderCal(){
-  const y=parseInt(document.getElementById('sy').value)||2025;
-  D.seasonYear=y;
+  const y=D.seasonYear||new Date().getFullYear();
+  document.getElementById('sy').value=y;
   document.getElementById('seasonRangeLabel').textContent=`Season: August ${y} — August ${y+1} · tap to toggle active/holiday`;
   const swks=seasonWks(y);
   const grid=document.getElementById('wgrid');
@@ -2207,7 +2424,7 @@ function renderAdCls(){
     const canArchive=n===0;
     return`<div class="ai">
       <div><div class="ai-name">${escapeHtml(c.name)} <span class="gbadge ${g.css}">${g.label}</span></div>
-      <div class="ai-sub">${c.day} · ${c.coach} · ${n} player${n!==1?'s':''}</div></div>
+      <div class="ai-sub">${c.day} · ${escapeHtml(c.coach)} · ${n} player${n!==1?'s':''}</div></div>
       <div class="ai-acts">
         <button class="btn btn-xs btn-outline" onclick="viewSquadPlayers('${c.id}')" title="View players & manage leaves">Players</button>
         <button class="btn btn-xs btn-outline" onclick="editCls('${c.id}')">Edit</button>
@@ -2228,7 +2445,7 @@ function renderAdCls(){
       const attCount=Object.keys(D.attendance).filter(k=>k.startsWith(c.id+'_')).length;
       return`<div class="ai" style="opacity:.7;border-left:3px solid var(--muted)">
         <div><div class="ai-name">${escapeHtml(c.name)} <span class="gbadge ${g.css}">${g.label}</span> <span style="font-size:.68rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px">archived</span></div>
-        <div class="ai-sub">${c.day} · ${c.coach}${weekStr} · ${attCount} week${attCount!==1?'s':''} of data</div></div>
+        <div class="ai-sub">${c.day} · ${escapeHtml(c.coach)}${weekStr} · ${attCount} week${attCount!==1?'s':''} of data</div></div>
         <div class="ai-acts">
           <button class="btn btn-xs btn-outline" onclick="unarchiveCls('${c.id}')">Restore</button>
           <button class="btn btn-xs btn-red" onclick="delCls('${c.id}')" title="Permanently delete squad and all attendance data">Delete</button>
@@ -2480,7 +2697,8 @@ async function confirmArchive(){
 }
 function restoreChild(id){
   const ch=D.children.find(c=>c.id===id);if(!ch)return;
-  const validIds=(ch.archivedFrom||[]).filter(cid=>D.classes.some(c=>c.id===cid));
+  // Filter to classes that exist AND are not archived — avoids restoring to an unreachable class
+  const validIds=(ch.archivedFrom||[]).filter(cid=>D.classes.some(c=>c.id===cid&&!c.archived));
   D.children=D.children.map(c=>c.id===id?{...c,status:'active',classIds:validIds,archivedAt:undefined,archivedFrom:undefined,archivedReason:undefined}:c);
   saveD();renderAdCh();renderLeavers();
   toast(validIds.length?`${ch.name} restored to ${validIds.length} squad(s) ✓`:`${ch.name} restored — please reassign squads ✓`);
@@ -2658,6 +2876,11 @@ async function delCh(id){
   const ch=D.children.find(c=>c.id===id);
   if(!confirm(`Permanently delete ${ch?.name||'this child'} and ALL their attendance history? This cannot be undone.`))return;
   D.children=D.children.filter(c=>c.id!==id);
+  // Remove orphan attendance records for this child across all classes and weeks
+  for(const key in D.attendance){
+    const rec=D.attendance[key];
+    if(rec&&rec.records){delete rec.records[id];}
+  }
   saveD();if(encKey)await saveNames();renderAdCh();toast('Permanently deleted');
 }
 
@@ -2678,8 +2901,9 @@ function saveAutoBackupDay(){
   toast('Backup day saved ✓');
 }
 
+function localDateStr(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 async function runAutoBackup(manual=false){
-  const today=new Date().toISOString().split('T')[0];
+  const today=localDateStr();
   const backup={...D,_exportedAt:new Date().toISOString()};
   const a=document.createElement('a');
   if(encKey){
@@ -2688,9 +2912,9 @@ async function runAutoBackup(manual=false){
       a.href=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/octet-stream'}));
       a.download=`squads-backup-${today}.tenc`;
     }catch(e){
-      // Fall back to plain JSON if encryption fails
-      a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
-      a.download=`squads-backup-${today}.json`;
+      console.error('Backup encryption failed:',e);
+      toast('Backup failed: encryption error — please re-enter PIN and try again.');
+      return;
     }
   }else{
     a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
@@ -2713,7 +2937,7 @@ function checkAutoBackup(){
   const lastRun=s.lastRun||'';
   const now=new Date();
   const todayDay=now.getDay(); // 0=Sun,1=Mon…6=Sat
-  const todayStr=now.toISOString().split('T')[0];
+  const todayStr=localDateStr(now);
   // Run if: today matches backup day AND hasn't run today yet
   if(todayDay===backupDay && lastRun!==todayStr){
     // Small delay so app finishes loading first
@@ -2764,6 +2988,7 @@ async function exportJSON(){
   }
 }
 function importJSON(){
+  if(!encKey){toast('Please restart the app and enter your PIN before importing data.');return;}
   const inp=document.createElement('input');inp.type='file';inp.accept='.json,.tenc';
   inp.onchange=e=>{
     const f=e.target.files[0];if(!f)return;
@@ -2776,7 +3001,18 @@ function importJSON(){
           const envelope=JSON.parse(ev.target.result);
           if(!envelope.tenc){toast('Not a valid .tenc file');return;}
           if(!encKey){toast('No active PIN session — restart app and enter PIN first');return;}
-          try{p=await decryptJSON(envelope,encKey);}
+          // Derive key from the salt embedded in the backup (may differ from current session salt)
+          let decryptKey=encKey;
+          const currentSalt=localStorage.getItem(SALT_KEY);
+          if(envelope.salt&&envelope.salt!==currentSalt){
+            const backupPin=await showInputModal({icon:'🔑',title:'Different PIN',sub:'This backup was made with a different PIN. Enter the PIN that was active when this backup was created.',placeholder:'PIN',type:'password'});
+            if(!backupPin)return;
+            try{
+              const bSalt=Uint8Array.from(atob(envelope.salt),c=>c.charCodeAt(0));
+              decryptKey=await deriveKey(backupPin,bSalt);
+            }catch(e){toast('Could not process backup salt — file may be corrupted');return;}
+          }
+          try{p=await decryptJSON(envelope,decryptKey);}
           catch(e){toast('Decryption failed — wrong PIN or corrupted file');return;}
         }else{
           p=JSON.parse(ev.target.result);
@@ -2802,19 +3038,24 @@ function importJSON(){
 async function nukeAll(){
   const stored=JSON.parse(localStorage.getItem(ADMIN_PW_KEY)||'null');
   if(!stored){toast('No admin password set — cannot delete');return;}
-  const entered=prompt('Enter admin password to delete all data:');
+  const entered=await showInputModal({icon:'⚠️',title:'Delete All Data',sub:'Enter admin password to confirm permanent deletion',placeholder:'Admin password'});
   if(entered===null)return;
   const ok=await verifyPassword(entered,stored);
   if(!ok){toast('Incorrect password — data not deleted');return;}
   if(!confirm('Delete ALL data permanently? Squads, children and all attendance records will be lost.'))return;
   if(!confirm('Last chance — this cannot be undone. Delete everything?'))return;
-  [NAMES_KEY,SALT_KEY,RECOVERY_KEY,'ta_v10'].forEach(k=>localStorage.removeItem(k));
+  [DATA_KEY,NAMES_KEY,SALT_KEY,RECOVERY_KEY,ADMIN_PW_KEY,AB_KEY,INC_PRICE_KEY].forEach(k=>localStorage.removeItem(k));
+  // Also clear sessionStorage so PIN session blobs don't linger after a wipe
+  try{sessionStorage.clear();}catch(e){}
   location.reload();
 }
 
 /* ── STATS JSON EXPORT ── */
 async function exportStatsJSON(){
   if(!D.classes.length){toast('No data to export');return;}
+  if(!encKey){
+    if(!confirm('No active PIN session — this export will include player names in plain text as a .json file.\n\nContinue without encryption?'))return;
+  }
   const aws=seasonWks(D.seasonYear).filter(w=>D.activeWeeks.includes(w));
   if(!aws.length){toast('No active weeks — check Holidays tab');return;}
 
@@ -3231,7 +3472,7 @@ function importPlayersXlsx(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls';
   inp.onchange=e=>{
     const r=new FileReader();
-    r.onload=ev=>{
+    r.onload=async ev=>{
       try{
         const wb=XLSX.read(ev.target.result,{type:'array'});
         const ws=wb.Sheets['Players'];
@@ -3254,8 +3495,7 @@ function importPlayersXlsx(){
           squadCols.forEach(col=>{
             const sn=(row[col]||'').toString().trim();
             if(!sn)return;
-            const cls=D.classes.find(c=>c.name.toLowerCase()===sn.toLowerCase()||
-              c.name.toLowerCase().includes(sn.toLowerCase()));
+            const cls=D.classes.find(c=>c.name.toLowerCase()===sn.toLowerCase());
             if(cls&&!classIds.includes(cls.id))classIds.push(cls.id);
           });
           if(!classIds.length){skipped++;return;}
@@ -3267,7 +3507,7 @@ function importPlayersXlsx(){
           D.children.push(child);
           added++;
         });
-        saveD();if(encKey)saveNames();renderAdCh();
+        saveD();if(encKey)await saveNames();renderAdCh();
         toast(`Players imported: ${added} added, ${skipped} skipped ✓`);
       }catch(err){toast('Error reading file: '+err.message);}
     };
@@ -3290,6 +3530,7 @@ function toast(msg){
 
 /* ── INIT ── */
 loadD();
+document.getElementById('sy').value=D.seasonYear||new Date().getFullYear();
 // silently pre-load SheetJS
 const _x=document.createElement('script');
 _x.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
@@ -3332,10 +3573,27 @@ document.addEventListener('visibilitychange', () => {
     _hiddenAt = 0;
   }
 });
+// PIN LOCK: inactivity timer — handles portrait overlay case where visibilitychange never fires
+// (page stays 'visible' when rotated but screen is blocked by the portrait prompt)
+// capture:true fires in the capture phase (top-down) before any child element can call
+// stopPropagation(), so modals, scroll containers and buttons cannot suppress these events.
+let _lastActivity = Date.now();
+const _resetActivity = () => { _lastActivity = Date.now(); };
+['touchstart','touchmove','touchend','click'].forEach(evt =>
+  document.addEventListener(evt, _resetActivity, {passive: true, capture: true})
+);
+setInterval(() => {
+  if (encKey && (Date.now() - _lastActivity) >= PIN_LOCK_MS) {
+    encKey = null;
+    D.children.forEach(c => { c.name = ''; c.playerID = ''; });
+    if (localStorage.getItem(NAMES_KEY)) showPinPrompt();
+    _lastActivity = Date.now(); // reset so the interval does not re-fire immediately
+  }
+}, 15000); // check every 15 s
 
 /* ── MONTHLY INCOME ── */
 const INC_PRICE_KEY='stats_grp_prices'; // shared key with stats.html
-const INC_DEFAULT={development:35.50,'pre-performance':49.50,'u11-performance':49.50,'o11-performance':59.50};
+const INC_DEFAULT={development:34.50,'pre-performance':49.50,'u11-performance':69.50,'o11-performance':69.50};
 const GRP_COLORS={dev:'#38bdf8',prepf:'#c084fc',u11:'#4ade80',o11:'#facc15'};
 const GRP_BG={dev:'#0a1929',prepf:'#25123c',u11:'#112614',o11:'#242208'};
 const GRP_BR={dev:'#0e3a5c',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
@@ -3408,6 +3666,7 @@ function renderAdIncome(){
       <div style="font-size:1.6rem;font-weight:900;font-family:var(--mono);line-height:1;color:#4ade80">${fmt(totalIncome)}</div>
       <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#4ade80;margin-top:5px">Monthly Income (All Squads)</div>
       <div style="margin-top:12px;display:flex;flex-direction:column;gap:7px;font-size:.76rem">${totalBreakdown}</div>
+      <div style="margin-top:10px;font-size:.68rem;color:var(--muted);line-height:1.5">Players attending multiple squads are counted once per squad, reflecting the Direct Debit billing model.</div>
     </div>
     ${rightCards}`
     :`<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted);font-size:.9rem">
