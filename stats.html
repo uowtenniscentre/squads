@@ -503,6 +503,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <script>
 'use strict';
 
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
 let SD=null;
 let trendGroupSel='all',squadGroupSel='all',heatmapGroupSel='all',leaverProgGroupSel='all';
 let activeTab='overview';
@@ -596,13 +598,11 @@ async function readFile(f){
         }
         if(!d.squads||!d.weeks){toast('Decrypted file is not a valid stats export');return;}
         SD=d;
-        try{sessionStorage.setItem('stats_sd',JSON.stringify(d));}catch(e){}
         showDashboard();
       }else{
         const d=JSON.parse(ev.target.result);
         if(!d.squads||!d.weeks)throw new Error('Not a valid stats export');
         SD=d;
-        try{sessionStorage.setItem('stats_sd',ev.target.result);}catch(e){}
         showDashboard();
       }
     }catch(err){toast('Invalid file: '+err.message);}
@@ -843,7 +843,7 @@ function renderSquadList(){
     const grp=GRP_MAP[sq.groupId]||{color:'#6b6f7a',label:sq.groupId};
     const c=sq.pct==null?'#2e3040':sq.pct>=80?'#22c55e':sq.pct>=60?'#fbbf24':'#f87171';
     return`<div class="squad-row">
-      <div><div class="squad-name">${sq.name}</div><div class="squad-grp" style="color:${grp.color}">${grp.label}</div></div>
+      <div><div class="squad-name">${escapeHtml(sq.name)}</div><div class="squad-grp" style="color:${grp.color}">${grp.label}</div></div>
       <div><div class="squad-bar-track"><div class="squad-bar-fill" style="width:${sq.pct||0}%;background:${c}"></div></div>
       <div style="font-size:.6rem;color:var(--muted);font-family:var(--mono);margin-top:3px">${sq.totalPresent}P · ${sq.totalAbsent}A · ${sq.players.length} players</div></div>
       <div class="squad-stat">${sq.totalPresent}</div>
@@ -876,13 +876,13 @@ function renderHeatmap(){
       const pct=(p+a)>0?Math.round(p/(p+a)*100):null;
       const pc=pct==null?'':pct>=80?'cell-pct-hi':pct>=60?'cell-pct-mid':'cell-pct-lo';
       const cells=wks.map(wk=>{const v=pl.weekData?pl.weekData[wk]:null;const cls=v==='P'?'cell-p':v==='A'?'cell-a':v==='H'?'cell-h':'cell-u';return`<td class="${cls}">${v==='P'?'P':v==='A'?'A':v==='H'?'·':''}</td>`;}).join('');
-      return`<tr><td class="player-name">${pl.name}${pl.playerID?`<span class="pid">${pl.playerID}</span>`:''}</td>${cells}<td class="stat-col" style="color:#22c55e">${p}</td><td class="stat-col" style="color:#f87171">${a}</td><td class="stat-col ${pc}">${pct!=null?pct+'%':'—'}</td></tr>`;
+      return`<tr><td class="player-name">${escapeHtml(pl.name)}${pl.playerID?`<span class="pid">${escapeHtml(pl.playerID)}</span>`:''}</td>${cells}<td class="stat-col" style="color:#22c55e">${p}</td><td class="stat-col" style="color:#f87171">${a}</td><td class="stat-col ${pc}">${pct!=null?pct+'%':'—'}</td></tr>`;
     }).join('');
     return`<div class="heatmap-squad">
       <div class="heatmap-squad-title">
         <span style="width:8px;height:8px;border-radius:50%;background:${grp.color};display:inline-block;flex-shrink:0"></span>
-        <span style="color:${grp.color}">${sq.name}</span>
-        <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${sq.coach} · ${players.length} players</span>
+        <span style="color:${grp.color}">${escapeHtml(sq.name)}</span>
+        <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${escapeHtml(sq.coach)} · ${players.length} players</span>
       </div>
       <div class="heatmap-wrap"><table class="heatmap-table">
         <thead><tr><th class="player-col">Player</th>${hdr}<th style="color:#22c55e">P</th><th style="color:#f87171">A</th><th>%</th></tr></thead>
@@ -982,13 +982,13 @@ function renderLeaversTab(){
     const pct=(l.totalPresent+l.totalAbsent)>0?Math.round(l.totalPresent/(l.totalPresent+l.totalAbsent)*100):null;
     const pc=pct==null?'var(--muted)':pct>=70?'#4ade80':'#f87171';
     const items=(l.squadLeaves||[]).map(lv=>{
-      const names=(lv.classIds||[]).map(id=>{const sq=SD.squads.find(s=>s.id===id);return sq?sq.name:'?';}).join(', ');
-      return`<div class="leaver-meta" style="font-family:var(--mono);font-size:.7rem">Left ${names}${lv.week?' — '+_wl(lv.week):''}${lv.reason?' · '+lv.reason:''}</div>`;
+      const names=(lv.classIds||[]).map(id=>{const sq=SD.squads.find(s=>s.id===id);return sq?escapeHtml(sq.name):'?';}).join(', ');
+      return`<div class="leaver-meta" style="font-family:var(--mono);font-size:.7rem">Left ${names}${lv.week?' — '+_wl(lv.week):''}${lv.reason?' · '+escapeHtml(lv.reason):''}</div>`;
     }).join('');
     return`<div class="leaver-card part">
       <div style="flex:1">
-        <div><span class="leaver-name">${l.name}</span><span class="leaver-badge part">still active</span></div>
-        <div class="leaver-meta">b. ${l.birthYear||'—'}${l.playerID?' · ID: '+l.playerID:''}</div>
+        <div><span class="leaver-name">${escapeHtml(l.name)}</span><span class="leaver-badge part">still active</span></div>
+        <div class="leaver-meta">b. ${l.birthYear||'—'}${l.playerID?' · ID: '+escapeHtml(l.playerID):''}</div>
         ${items}
         <div class="leaver-meta" style="color:${pc};margin-top:4px;font-family:var(--mono);font-size:.72rem">${pct!=null?pct+'% overall · ':''}${l.totalPresent}P / ${l.totalAbsent}A</div>
       </div></div>`;
@@ -1007,13 +1007,13 @@ function _renderProgList(prog){
   document.getElementById('leaverProgList').innerHTML=filtered.map(l=>{
     const pct=(l.totalPresent+l.totalAbsent)>0?Math.round(l.totalPresent/(l.totalPresent+l.totalAbsent)*100):null;
     const pc=pct==null?'var(--muted)':pct>=70?'#4ade80':'#f87171';
-    const sqNames=(l.squads||[]).map(s=>s.name).join(', ')||'—';
+    const sqNames=(l.squads||[]).map(s=>escapeHtml(s.name)).join(', ')||'—';
     return`<div class="leaver-card prog">
       <div style="flex:1">
-        <div><span class="leaver-name">${l.name}</span><span class="leaver-badge prog">left programme</span></div>
-        <div class="leaver-meta">b. ${l.birthYear||'—'} · ${l.gender==='f'?'Female':'Male'}${l.playerID?' · ID: '+l.playerID:''}</div>
+        <div><span class="leaver-name">${escapeHtml(l.name)}</span><span class="leaver-badge prog">left programme</span></div>
+        <div class="leaver-meta">b. ${l.birthYear||'—'} · ${l.gender==='f'?'Female':'Male'}${l.playerID?' · ID: '+escapeHtml(l.playerID):''}</div>
         <div class="leaver-meta">Was in: ${sqNames}</div>
-        <div class="leaver-meta" style="font-family:var(--mono);font-size:.7rem">${l.archivedAt?'Left '+_wl(l.archivedAt)+' ('+l.archivedAt+')':'Week not recorded'}${l.archivedReason?' · '+l.archivedReason:''}</div>
+        <div class="leaver-meta" style="font-family:var(--mono);font-size:.7rem">${l.archivedAt?'Left '+_wl(l.archivedAt)+' ('+l.archivedAt+')':'Week not recorded'}${l.archivedReason?' · '+escapeHtml(l.archivedReason):''}</div>
         <div class="leaver-meta" style="color:${pc};font-family:var(--mono);font-size:.72rem;margin-top:2px">${pct!=null?pct+'% attendance · ':''}${l.totalPresent}P / ${l.totalAbsent}A</div>
         <div class="att-bar-track"><div class="att-bar-fill" style="width:${pct||0}%;background:${pc}"></div></div>
       </div></div>`;
@@ -1076,9 +1076,9 @@ function renderArchivedTab(){
       return`<div class="heatmap-squad" style="opacity:.8;border-left:3px solid var(--muted)">
         <div class="heatmap-squad-title">
           <span style="width:8px;height:8px;border-radius:50%;background:${grp.color};display:inline-block;flex-shrink:0"></span>
-          <span style="color:${grp.color}">${sq.name}</span>
+          <span style="color:${grp.color}">${escapeHtml(sq.name)}</span>
           <span style="font-size:.6rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px;margin-left:4px">archived</span>
-          <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${sq.coach} · ${archivedLabel}</span>
+          <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${escapeHtml(sq.coach)} · ${archivedLabel}</span>
         </div>
         <p style="color:var(--muted);font-size:.84rem;padding:6px 0">No player attendance records in this export.</p>
       </div>`;
@@ -1096,7 +1096,7 @@ function renderArchivedTab(){
         return`<td class="${cls}">${v==='P'?'P':v==='A'?'A':v==='H'?'·':''}</td>`;
       }).join('');
       return`<tr>
-        <td class="player-name">${pl.name}${pl.playerID?`<span class="pid">${pl.playerID}</span>`:''}</td>
+        <td class="player-name">${escapeHtml(pl.name)}${pl.playerID?`<span class="pid">${escapeHtml(pl.playerID)}</span>`:''}</td>
         ${cells}
         <td class="stat-col" style="color:#22c55e">${p}</td>
         <td class="stat-col" style="color:#f87171">${a}</td>
@@ -1107,9 +1107,9 @@ function renderArchivedTab(){
     return`<div class="heatmap-squad" style="opacity:.85;border-left:3px solid rgba(107,111,122,0.4)">
       <div class="heatmap-squad-title">
         <span style="width:8px;height:8px;border-radius:50%;background:${grp.color};display:inline-block;flex-shrink:0"></span>
-        <span style="color:${grp.color}">${sq.name}</span>
+        <span style="color:${grp.color}">${escapeHtml(sq.name)}</span>
         <span style="font-size:.6rem;font-weight:600;color:var(--muted);background:rgba(107,111,122,.15);padding:2px 6px;border-radius:4px;margin-left:4px">archived</span>
-        <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${sq.coach} · ${archivedLabel}</span>
+        <span style="color:var(--muted);font-size:.65rem;font-weight:400">· ${escapeHtml(sq.coach)} · ${archivedLabel}</span>
       </div>
       ${summaryRow}
       <div class="heatmap-wrap"><table class="heatmap-table">
@@ -1129,19 +1129,11 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 let _rt;
 window.addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(()=>{if(SD){if(activeTab==='overview')renderTrend();if(activeTab==='leavers')renderLeaversTab();}},120);});
 
-/* ── SESSION RESTORE — called after PIN gate passes (or immediately if no gate needed) ── */
-function attemptSessionRestore(){
-  try{
-    const raw=sessionStorage.getItem('stats_sd');
-    if(!raw)return;
-    const d=JSON.parse(raw);
-    if(!d.squads||!d.weeks)return;
-    SD=d;
-    showDashboard();
-    const tab=sessionStorage.getItem('stats_tab');
-    if(tab&&document.getElementById('tab-'+tab))showTab(tab);
-  }catch(e){}
-}
+/* ── SESSION RESTORE — intentionally no-op (BUG-040: removed plaintext sessionStorage cache) ── */
+// Stats data is never cached to sessionStorage — user must reload the .tenc / .json file after a tab reload.
+// The PIN gate already provides re-authentication; storing the decrypted payload in sessionStorage
+// would expose all attendance data in plaintext to any JS running on the same origin.
+function attemptSessionRestore(){}
 
 /* ── PIN GATE & 60-SECOND BACKGROUND LOCK ── */
 const DATA_VERSION=10; // must match index.html — bump together on any breaking schema change
@@ -1262,7 +1254,7 @@ function lockStats(){
   SD=null;
   _hiddenAt=0;
   if(_statsInactiveTimer){clearInterval(_statsInactiveTimer);_statsInactiveTimer=null;}
-  try{sessionStorage.removeItem('stats_sd');sessionStorage.removeItem('stats_tab');}catch(e){}
+  try{sessionStorage.removeItem('stats_tab');}catch(e){}
   const main=document.querySelector('.stats-main');
   if(main)main.scrollTop=0;
   document.getElementById('dashboard').style.display='none';

@@ -33,12 +33,13 @@ self.addEventListener('activate', e => {
 });
 
 // Fetch strategy:
-// - index.html: ALWAYS fetch fresh from network, fall back to cache only if offline
+// - index.html / stats.html: ALWAYS fetch fresh from network, fall back to cache only if offline
 // - everything else: cache first
 self.addEventListener('fetch', e => {
   if (!e.request.url.startsWith(self.location.origin)) return;
 
   const isHTML = e.request.url.includes('index.html') ||
+                 e.request.url.includes('stats.html') ||
                  e.request.url.endsWith('/squads/') ||
                  e.request.url.endsWith('/squads');
 
@@ -47,9 +48,11 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request)
         .then(response => {
-          // Cache the fresh copy
-          const copy = response.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
+          // Cache the fresh copy only if the response is valid (BUG-041 fix)
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy));
+          }
           return response;
         })
         .catch(() => {

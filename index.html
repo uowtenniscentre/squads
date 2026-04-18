@@ -1238,7 +1238,11 @@ async function checkSecurity(){
   const hasNames=!!localStorage.getItem(NAMES_KEY);
   if(!hasPw){showFirstTimeSetup();return;}
   if(hasNames){showPinPrompt();return;}
-  unlockApp();
+  // BUG-039 fix: admin credentials exist but NAMES_KEY is absent (partial wipe / storage eviction).
+  // Silently unlocking here skips the PIN gate and exposes attendance/squad metadata.
+  // Show the PIN prompt; it will fail to decrypt but the user can use Admin → Data → Recovery
+  // rather than bypassing the gate entirely.
+  showPinPrompt();
 }
 function unlockApp(){
   document.getElementById('pinScreen').style.display='none';
@@ -1944,7 +1948,7 @@ function renderOverview(){
       h+=`<div style="background:${n.bg};border:1.5px solid ${n.br};border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:16px">
         <div style="flex:1">
           <div style="font-size:1.5rem;font-weight:700;color:var(--text)">${escapeHtml(n.player)} <span style="font-size:.85rem;font-weight:500;color:var(--muted)">b. ${n.birthYear}</span></div>
-          <div style="font-size:.82rem;color:var(--muted);margin-top:3px">${n.squad}</div>
+          <div style="font-size:.82rem;color:var(--muted);margin-top:3px">${escapeHtml(n.squad)}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:.97rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:${n.col};margin-bottom:4px">Turning age ${n.age} in ${yr}</div>
@@ -2181,7 +2185,7 @@ function renderAttBody(){
   body.innerHTML=`
     <div class="card" style="padding:12px 16px">
       <div class="sec-lbl" style="margin-bottom:7px;font-size:1.02rem;color:var(--accent-light);font-weight:600">📝 COACH NOTES</div>
-      <textarea class="fi" id="noteTa" rows="2" placeholder="Injuries, incidents, follow-ups…" oninput="saveNote()" style="margin-bottom:4px;resize:none;line-height:1.5"></textarea>
+      <textarea class="fi" id="noteTa" rows="2" placeholder="Injuries, incidents, follow-ups…" oninput="saveNote()" onblur="flushNote()" style="margin-bottom:4px;resize:none;line-height:1.5"></textarea>
       <div style="font-size:.7rem;color:var(--muted)">Auto-saved · included in Excel export</div>
     </div>
     <div class="card tight">
@@ -2251,11 +2255,24 @@ function clearMarks(){
   if(D.attendance[aKey])D.attendance[aKey].records={};
   saveD();renderAttBody();
 }
+/* BUG-044: debounce saveD() in saveNote() to avoid a localStorage write on every keystroke */
+let _noteTm=null;
 function saveNote(){
+  clearTimeout(_noteTm);
+  _noteTm=setTimeout(()=>{
+    const aKey=`${selCls}_${selWk}`;
+    if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
+    D.attendance[aKey].notes=document.getElementById('noteTa').value;
+    saveD();
+  },400);
+}
+function flushNote(){
+  if(!_noteTm)return;
+  clearTimeout(_noteTm);_noteTm=null;
   const aKey=`${selCls}_${selWk}`;
   if(!D.attendance[aKey])D.attendance[aKey]={records:{},notes:''};
-  D.attendance[aKey].notes=document.getElementById('noteTa').value;
-  saveD();
+  const el=document.getElementById('noteTa');
+  if(el){D.attendance[aKey].notes=el.value;saveD();}
 }
 function activateWeek(){
   if(!D.activeWeeks.includes(selWk))D.activeWeeks.push(selWk);
@@ -2295,7 +2312,7 @@ function renderStats(){
   let html=`<div class="card tight">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <span class="gbadge ${g.css}">${g.label}</span>
-      <span style="font-weight:800">${cls.name}</span>
+      <span style="font-weight:800">${escapeHtml(cls.name)}</span>
     </div>
     <div class="stat-row" style="margin-bottom:12px">
       <div class="stat-box"><div class="stat-n" style="color:var(--g)">${kids.length}</div><div class="stat-l">Students</div></div>
@@ -2307,7 +2324,7 @@ function renderStats(){
     html+=`<table class="stbl"><thead><tr><th>Name</th><th>Born</th><th>Present</th><th>Absent</th><th>Rate</th></tr></thead><tbody>`;
     rows.forEach(s=>{
       const col=s.pct===null?'var(--muted)':s.pct>=80?'var(--present)':s.pct>=60?'var(--holiday)':'var(--absent)';
-      html+=`<tr><td><strong>${s.name}</strong></td><td style="font-family:var(--mono);font-size:.75rem">${s.birthYear}</td>
+      html+=`<tr><td><strong>${escapeHtml(s.name)}</strong></td><td style="font-family:var(--mono);font-size:.75rem">${s.birthYear}</td>
         <td style="color:var(--present);font-weight:700">${s.p}</td>
         <td style="color:var(--absent);font-weight:700">${s.a}</td>
         <td>${s.pct!==null?`<div class="bar-w"><div class="bar-bg"><div class="bar-fill" style="width:${s.pct}%;background:${col}"></div></div><span class="bar-pct" style="color:${col}">${s.pct}%</span></div>`:'—'}</td></tr>`;
@@ -2509,7 +2526,7 @@ function renderAdCh(){
   else{
     el.innerHTML=kids.map(ch=>{
       const cids=ch.classIds||[];
-      const badgeStack=cids.map(cid=>{const cls=D.classes.find(c=>c.id===cid);const g=cls?GROUPS.find(g=>g.id===cls.group):null;return cls&&g?`<span class="gbadge ${g.css}" style="font-size:.78rem;display:block;width:fit-content">${cls.name}</span>`:''}).filter(Boolean).join('');
+      const badgeStack=cids.map(cid=>{const cls=D.classes.find(c=>c.id===cid);const g=cls?GROUPS.find(g=>g.id===cls.group):null;return cls&&g?`<span class="gbadge ${g.css}" style="font-size:.78rem;display:block;width:fit-content">${escapeHtml(cls.name)}</span>`:''}).filter(Boolean).join('');
       const pidStr=ch.playerID?` · ID: ${ch.playerID}`:'';
       const count=cids.length;
       return`<div class="ai" style="align-items:center;gap:10px">
@@ -2544,9 +2561,9 @@ function renderLeavers(){
       const pctStr=pct!=null?`${pct}% attendance · ${tp}P / ${ta}A`:'No attendance data';
       const pctCol=pct==null?'var(--muted)':pct>=70?'#4ade80':'#f87171';
       const fromIds=ch.archivedFrom||[];
-      const squadNames=fromIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?c.name:null;}).filter(Boolean);
+      const squadNames=fromIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?escapeHtml(c.name):null;}).filter(Boolean);
       const weekStr=ch.archivedAt?`Left ${wkLbl(ch.archivedAt)} (${ch.archivedAt})`:'';
-      const reasonStr=ch.archivedReason?` · ${ch.archivedReason}`:'';
+      const reasonStr=ch.archivedReason?` · ${escapeHtml(ch.archivedReason)}`:'';
       return`<div class="ai" style="opacity:.85;border-left:3px solid #f87171">
         <div style="flex:1;min-width:0">
           <div class="ai-name" style="color:var(--text)">${escapeHtml(ch.name)} <span style="font-size:.68rem;font-weight:600;color:#f87171;background:rgba(248,113,113,.12);padding:2px 6px;border-radius:4px">left programme</span></div>
@@ -2565,13 +2582,13 @@ function renderLeavers(){
     html+=partials.map(ch=>{
       const leaves=ch.squadLeaves||[];
       const leaveItems=leaves.map(lv=>{
-        const names=lv.classIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?c.name:null;}).filter(Boolean).join(', ');
+        const names=lv.classIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?escapeHtml(c.name):null;}).filter(Boolean).join(', ');
         const wStr=lv.week?`${wkLbl(lv.week)} (${lv.week})`:'';
-        const rStr=lv.reason?` · ${lv.reason}`:'';
+        const rStr=lv.reason?` · ${escapeHtml(lv.reason)}`:'';
         return`<div style="font-size:.72rem;font-family:var(--mono);color:var(--muted);margin-top:2px">Left ${names} — ${wStr}${rStr}</div>`;
       }).join('');
       const curIds=ch.classIds||[];
-      const curNames=curIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?c.name:null;}).filter(Boolean).join(', ');
+      const curNames=curIds.map(id=>{const c=D.classes.find(x=>x.id===id);return c?escapeHtml(c.name):null;}).filter(Boolean).join(', ');
       return`<div class="ai" style="opacity:.9;border-left:3px solid #fbbf24">
         <div style="flex:1;min-width:0">
           <div class="ai-name" style="color:var(--text)">${escapeHtml(ch.name)} <span style="font-size:.68rem;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.12);padding:2px 6px;border-radius:4px">still active</span></div>
@@ -2638,7 +2655,7 @@ function openArchiveModForSquad(childId, squadId){
     const checked=cid===squadId;
     return`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">
       <input type="checkbox" value="${cid}" ${checked?'checked':''} style="width:15px;height:15px;accent-color:#A499F4">
-      ${cls.name}
+      ${escapeHtml(cls.name)}
     </label>`;
   }).join('');
   document.getElementById('archiveChildId').value=childId;
@@ -2657,7 +2674,7 @@ function openArchiveMod(id){
     const cls=D.classes.find(x=>x.id===cid);if(!cls)return'';
     return`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">
       <input type="checkbox" value="${cid}" checked style="width:15px;height:15px;accent-color:#A499F4">
-      ${cls.name}
+      ${escapeHtml(cls.name)}
     </label>`;
   }).join('');
   document.getElementById('archiveChildId').value=id;
@@ -3027,7 +3044,17 @@ function importJSON(){
         D=p;
         delete D._exportedAt;
         saveD();
-        if(encKey)await saveNames(); // re-encrypt names from restored data
+        // BUG-038 fix: only call saveNames() if the backup actually contains names.
+        // Plaintext .json backups produced by exportSetupBackup() / saveD() strip names —
+        // calling saveNames() on nameless children would wipe the encrypted names store.
+        if(encKey){
+          const hasNames=(D.children||[]).some(c=>c.name);
+          if(hasNames){
+            await saveNames();
+          }else{
+            toast('⚠️ Backup had no player names — existing names preserved. Use a .tenc backup to fully restore names.');
+          }
+        }
         renderAdCls();renderAdCh();renderGroups();renderToday();
         toast('Backup restored ✓ — all data replaced');
       }catch{toast('Invalid file — could not parse backup');}
@@ -3480,7 +3507,8 @@ function importPlayersXlsx(){
         if(!ws){toast('Sheet "Players" not found in file');return;}
         const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
         if(!rows.length){toast('No data rows found in Players sheet');return;}
-        let added=0,skipped=0;
+        let added=0,skipped=0,invalidBy=0;
+        const _curYr=new Date().getFullYear();
         rows.forEach(row=>{
           const firstName=(row['First Name']||row['First name']||row['firstname']||'').toString().trim();
           const lastName=(row['Last name']||row['Last Name']||row['lastname']||'').toString().trim();
@@ -3488,6 +3516,8 @@ function importPlayersXlsx(){
           if(!fullName){skipped++;return;}
           const pid=(row['ID']||'').toString().trim();
           const birthYear=parseInt(row['Birth Year']||row['Birth year']||row['birthyear']||0);
+          // BUG-043: reject rows whose birth year is supplied but out of plausible range
+          if(birthYear&&(birthYear<1990||birthYear>_curYr)){invalidBy++;return;}
           const genderRaw=(row['Gender']||'').toString().trim().toLowerCase();
           const gender=genderRaw==='f'||genderRaw==='female'||genderRaw==='girl'?'f':'m';
           // Resolve squad names to IDs — look at Squad1..Squad5 columns
@@ -3509,7 +3539,9 @@ function importPlayersXlsx(){
           added++;
         });
         saveD();if(encKey)await saveNames();renderAdCh();
-        toast(`Players imported: ${added} added, ${skipped} skipped ✓`);
+        const parts=[`${added} added`,`${skipped} skipped`];
+        if(invalidBy)parts.push(`${invalidBy} invalid birth year`);
+        toast(`Players imported: ${parts.join(', ')} ✓`);
       }catch(err){toast('Error reading file: '+err.message);}
     };
     r.readAsArrayBuffer(e.target.files[0]);
@@ -3594,7 +3626,7 @@ setInterval(() => {
 
 /* ── MONTHLY INCOME ── */
 const INC_PRICE_KEY='stats_grp_prices'; // shared key with stats.html
-const INC_DEFAULT={development:34.50,'pre-performance':49.50,'u11-performance':69.50,'o11-performance':69.50};
+const INC_DEFAULT={development:35.50,'pre-performance':49.50,'u11-performance':49.50,'o11-performance':59.50}; // synced with stats.html DEFAULT_PRICES (BUG-042)
 const GRP_COLORS={dev:'#38bdf8',prepf:'#c084fc',u11:'#4ade80',o11:'#facc15'};
 const GRP_BG={dev:'#0a1929',prepf:'#25123c',u11:'#112614',o11:'#242208'};
 const GRP_BR={dev:'#0e3a5c',prepf:'#482464',u11:'#1e4020',o11:'#403e12'};
